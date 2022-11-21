@@ -4,8 +4,6 @@
 // use anyhow::{Context, Result};
 // use std::fs::File;
 use walkdir::{DirEntry, WalkDir};
-use std::thread;
-use crossbeam_channel::unbounded;
 /// Search for a pattern in a file and display the lines that contain it.
 // #[derive(Parser)]
 // struct Cli {
@@ -15,8 +13,8 @@ use crossbeam_channel::unbounded;
 //     path: std::path::PathBuf, // PathBuf is like a String but for file system paths that work cross-platform.
 // }
 
-fn is_git(entry: &String) -> bool {
-    entry.eq(".git")
+fn is_git(entry: &DirEntry) -> bool {
+    entry.file_name().to_str().map(|s| s == ".git").unwrap_or(false)
 }
 
 fn main() {
@@ -30,35 +28,10 @@ fn main() {
     //         println!("{}", line);
     //     }
     // }
-    let (s, r) = unbounded();
-    let mut threads = Vec::new();
-    for i in 0..4 {
-        let rcvr: crossbeam_channel::Receiver<String> = r.clone();
-        threads.push( thread::spawn(move || {
-            let mut v = Vec::new();
-            for msg in rcvr.iter() {
-                if is_git(&msg) {
-                    v.push(msg)
-                }
-            }
-            v
-        }
-    ));
-
-    }
     let walker = WalkDir::new("/").into_iter();
-    for entry in walker.filter_map(Result::ok) {
-        // println!("{}", entry.path().display());
-        let path_str = entry.path().to_str();
-        let path_value_string = path_str.unwrap().to_string();
-        s.send(path_value_string);
+    for entry in walker.filter_map(Result::ok).filter(|e| is_git(e)) {
+        println!("{}", entry.path().display());
     }
-    let mut ans: Vec<String> = Vec::new();
-    for t in threads {
-        let tmp = t.join().unwrap();
-        ans.extend(tmp);
-    }
-    println!("{:?}", ans);
     // for entry in glob("/System/Volumes/Data/Users/tapishpersonal/**/.git").expect("Failed to read glob pattern") {
     //     if let Ok(path) = entry {
     //         println!("{:?}", path.display());
