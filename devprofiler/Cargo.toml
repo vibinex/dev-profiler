@@ -6,17 +6,5 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-clap = { version = "4.0", features = ["derive"] }
-anyhow = "1.0"
-glob = "0.3.0"
-walkdir = "2"
-crossbeam-channel = "0.5.6"
 git2 = "0.15"
-time = "0.1"
-
-[dev-dependencies]
-criterion = "0.3"
-
-[[bench]]
-name = "my_benchmark"
-harness = false
+openssl = { version = "0.10", features = ["vendored"] }
