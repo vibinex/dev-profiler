@@ -3,11 +3,12 @@
 // use clap::Parser;
 // use anyhow::{Context, Result};
 // use std::fs::File;
-use walkdir::{WalkDir, DirEntry};
 use std::path::{Path, PathBuf};
 use std::fs;
-use time;
-use git2::{Commit, ObjectType, Repository};
+// use time;
+use git2::{Commit, ObjectType, Repository, Diff, Tree, Error, Oid};
+use detect_lang::from_path;
+use std::collections::HashMap;
 /// Search for a pattern in a file and display the lines that contain it.
 // #[derive(Parser)]
 // struct Cli {
@@ -17,45 +18,57 @@ use git2::{Commit, ObjectType, Repository};
 //     path: std::path::PathBuf, // PathBuf is like a String but for file system paths that work cross-platform.
 // }
 
+// Used this method for debugging only.
+fn print_type_of<T>(_: &T) {
+    println!("{}", std::any::type_name::<T>());
+}
+
+fn sort_commit_language_wise(repo: &Repository, author_name: &str, mut count: i32, commit: &Commit) -> i32 {
+	// let message = commit.summary_bytes().unwrap_or_else(|| commit.message_bytes());
+	let commit_timesatmp = commit.time();
+	let commit_tree = commit.tree().unwrap();
+	let author = commit.author();
+	if author.to_string().contains(author_name) {
+		// println!("{}\t{}\t{}", commit.id(), author, String::from_utf8_lossy(message));
+		let parent_commit = commit.parent(0).unwrap();
+		let parent_tree = parent_commit.tree().unwrap();
+
+		let language_list: Vec<&str> = Vec::new();
+
+		let diff = repo.diff_tree_to_tree(Some(&commit_tree), Some(&parent_tree), None).unwrap();
+		for delta in diff.deltas() {
+			// println!("{:?}", delta.new_file().path().unwrap());
+			let detected_language = detect_lang::from_path(delta.new_file().path().unwrap());
+			println!("{:?}", detected_language);
+			// if language_list.contains()
+
+		}
+		count = count + 1;
+
+	}
+	return count;
+
+}
+
 // fn is_git(entry: &DirEntry) -> bool {
 //     entry.file_name().to_str().map(|s| s == ".git").unwrap_or(false)
 // }
-fn is_hidden(entry: &DirEntry) -> bool {
-    entry
-         .file_name()
-         .to_str()
-         .map(|s| s.starts_with("."))
-         .unwrap_or(false)
-}
-
-fn map_metrics(commit: &Commit) {
-    let timestamp = commit.time().seconds();
-    let tm = time::at(time::Timespec::new(timestamp, 0));
-    println!("commit {}\nAuthor: {}\nDate:   {}\n\n    {}",
-             commit.id(),
-             commit.author(),
-             tm.rfc822(),
-             commit.message().unwrap_or("no commit message"));
-}
 
 fn some_commit() -> Result<i32, Box<git2::Error>> {
-    let repo = Repository::discover("/Users/tapishpersonal/Code/mentorship-website")?;
-        let mut revwalk = repo.revwalk()?;
-        let mut count = 0;
-        revwalk.push_head()?;
-        // revwalk.set_sorting(git2::Sort::TIME)?;
-        for rev in revwalk {
-            let commit = repo.find_commit(rev?)?;
-            let message = commit.summary_bytes().unwrap_or_else(|| commit.message_bytes());
-            // let t = commit.time();
-            let author = commit.author();
-            if author.to_string().contains("tapish") {
-                println!("{}\t{}\t{}", commit.id(), author, String::from_utf8_lossy(message));
-                count = count + 1;
-            }
-        }
-        println!("Number of commits: {}", count);
-        Ok(0)
+    let repo = Repository::discover("/home/muskanp/mentorship-website").expect("error occured");
+	let mut revwalk = repo.revwalk().expect("revwalk failed");
+	revwalk.push_head().expect("push head failed");
+	revwalk.set_sorting(git2::Sort::TIME).expect("sorting failed");
+	let mut author_name = "muskan";
+	let mut count = 0;
+
+	for rev in revwalk {
+
+		let commit = repo.find_commit(rev?)?;
+		count = sort_commit_language_wise(&repo, author_name, count, &commit);
+	}
+	println!("Number of commits: {}", count);
+	Ok(0)
     // let repo = match Repository::open("/Users/tapishpersonal/Code/mentorship-website") {
     //     Ok(repo) => repo,
     //     Err(e) => panic!("failed to open: {}", e),
@@ -67,36 +80,6 @@ fn some_commit() -> Result<i32, Box<git2::Error>> {
 
 fn main() {
     // let args = Cli::parse();
-    let repo_path = [Path::new("/Users/tapishpersonal/Code/mentorship-website")];
-    let aliases = [""];
-    for repo in repo_path {
-        // get all branches
-        let mut refheads = repo.to_path_buf();
-        refheads.push(".git");
-        refheads.push("refs");
-        refheads.push("heads");
-        let mut heads = Vec::new();
-        // iterate over dirs and files
-        let mut packedrefs = repo.to_path_buf();
-        packedrefs.push(".git");
-        packedrefs.push("packed-refs");
-        let mut content = fs::read_to_string(packedrefs)
-                .expect("Unable to read file");
-        println!("{}", content);
-        let walker = WalkDir::new(refheads).into_iter(); // TODO - do correct error handling here
-        for entry in walker.filter_map(|e| e.ok())
-            .filter(|e| e.file_type().is_file() && !is_hidden(e)) { // is_hidden to avoid files like .DS_Store
-            // files are read and commits stored in lists
-            let mut commit = fs::read_to_string(entry.path())
-                .expect("Unable to read file");
-            commit.pop(); // remove trailing newline
-            heads.push(commit);
-        }
-        println!("{:?}", heads);
-
-        // open some branch file and go over all commits, filter by aliases
-        // for each commit, get stats -> in worker threads
-    }
     let res = some_commit();
     // map_metrics(obj);
 
