@@ -1,4 +1,9 @@
-#![allow(unused)]
+use workerpool::Pool;
+use workerpool::thunk::{Thunk, ThunkWorker};
+use git2::{Commit, Repository};
+use std::sync::mpsc::channel;
+use std::sync::Mutex;
+use clap::Parser;
 
 use core::time;
 use std::hash::Hash;
@@ -109,32 +114,18 @@ fn main() {
     //     }
     // }
 
-    //Scanner
-    // let walker = WalkDir::new("/").into_iter();
-    // for entry in walker.filter_map(Result::ok).filter(|e| is_git(e)) {
-        // Also see filter_entry
-    //     println!("{}", entry.path().display());
-    // }
 
-    // Ok(())
-    // let mut f = File::open("/Users/tapishpersonal/Code/mentorship-website/.git/objects/bb/721ad95595bd8e023387e7af46aef3480c80f3")?;
-    // let metadata = f.metadata()?;
-    // for (key, value) in metadata {
-    //     println!("{}: {}", key, value);
-    // }
-    // Ok(())
-}
-fn answer() -> i64 {
-    (42)
-}
-#[test]
-// test all branches are there
-// test filtering of commits, if all commits visited and filtering is correct
-// test correctness of stats
-// test reduce step correctness
-// test final calculation
-// test jsonl rendering for correctness
-// test thread management? if all are finished etc
-fn check_answer_validity() {
-    assert_eq!(answer(), 42);
-}
+// fn answer() -> i64 {
+//     42
+// }
+// #[test]
+// // test all branches are there
+// // test filtering of commits, if all commits visited and filtering is correct
+// // test correctness of stats
+// // test reduce step correctness
+// // test final calculation
+// // test jsonl rendering for correctness
+// // test thread management? if all are finished etc
+// fn check_answer_validity() {
+//     assert_eq!(answer(), 42);
+// }
