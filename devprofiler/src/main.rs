@@ -2,6 +2,12 @@ use clap::Parser;
 use git2::{ Repository, Diff, Commit };
 use detect_lang;
 use std::path::Path;
+use serde::Serialize;
+use flate2::Compression;
+use flate2::write::GzEncoder;
+use std::fs::File;
+use std::io::BufWriter;
+use std::io::Write;
 
 #[derive(Parser)]
 struct Cli {
@@ -11,7 +17,7 @@ struct Cli {
     path: std::path::PathBuf,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 struct DiffInfo {
     insertions: usize,
     deletions: usize,
@@ -19,13 +25,13 @@ struct DiffInfo {
     file_info: Vec<DiffFileInfo>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 struct DiffFileInfo {
     filepath: String,
     v_language: String,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 struct CommitInfo {
     commit_id: String,
     author_name: String,
@@ -94,14 +100,25 @@ fn analyze_repo(arg_ref: &Cli) {
     let repo = Repository::discover(&arg_ref.path).unwrap();
     let mut revwalk = repo.revwalk().unwrap();
     revwalk.push_head().unwrap();
+    let file = File::create("devprofiler.json.gz").unwrap();
+    let mut bufw = BufWriter::new(file);
+    let mut gze = GzEncoder::new(bufw, Compression::default());
     for rev in revwalk {
         let commit = repo.find_commit(rev.unwrap()).unwrap();
         let commit_tree = commit.tree().unwrap();
-	    let parent_tree = commit.parent(0).unwrap().tree().unwrap();
+	    let parent = commit.parent(0);
+        if !parent.is_ok() {
+            continue;
+            // todo - fix me
+        }
+        let parent_tree = parent.unwrap().tree().unwrap();
         let diff = repo.diff_tree_to_tree(Some(&commit_tree), Some(&parent_tree), None).unwrap();
         let cinfo = CommitInfo::new(&commit, &diff);
-        println!("{:?}", cinfo);
+        let serialized = serde_json::to_string(&cinfo).unwrap();
+        println!("serialized = {}", serialized);
+        gze.write(serialized.as_bytes());
     }
+    gze.finish();
 }
 
 fn main() {
