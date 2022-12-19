@@ -1,7 +1,7 @@
 use clap::Parser;
 use git2::{ Repository, Diff, Commit };
 use detect_lang;
-use std::path::{Path, Component};
+use std::path::Path;
 use serde::Serialize;
 use flate2::Compression;
 use flate2::write::GzEncoder;
@@ -13,6 +13,7 @@ use std::ffi::OsStr;
 
 // TODO - logging
 // TODO - error handling
+// TODO - avoid user hashing for email/name
 
 #[derive(Parser)]
 struct Cli {
@@ -95,9 +96,12 @@ impl CommitInfo {
 
 impl DiffFileInfo {
     fn new(path: &Path, lang: &String) -> Self {
+        let fname = digest(path.file_stem().unwrap().to_str().unwrap().to_string());
+        let extension = path.extension().unwrap_or_default().to_str().unwrap();
+        let hashed_fname = fname + "." + extension;
         Self {
             path_hash: digest(path.to_path_buf().into_os_string().into_string().unwrap()),
-            filename: path.file_name().unwrap().to_str().unwrap().to_string(),
+            filename: hashed_fname,
             v_language: String::from(lang),
         }
     }
