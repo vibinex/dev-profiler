@@ -107,6 +107,12 @@ impl DiffFileInfo {
     }
 }
 
+#[derive(Clone, Debug, Serialize)]
+struct RunInfo {
+    aliases: Vec<String>,
+    repos: Vec<String>,
+}
+
 fn analyze_repo(arg_ref: &Cli) {
     let repo = Repository::discover(&arg_ref.path).unwrap();
     let mut revwalk = repo.revwalk().unwrap();
@@ -114,6 +120,11 @@ fn analyze_repo(arg_ref: &Cli) {
     let file = File::create("devprofiler.json.gz").unwrap();
     let bufw = BufWriter::new(file);
     let mut gze = GzEncoder::new(bufw, Compression::default());
+    let first_obj: RunInfo = RunInfo {
+        aliases: vec![arg_ref.user.clone()],
+        repos: vec![arg_ref.path.as_os_str().to_str().unwrap_or_default().to_string().clone()],
+    };
+    gze.write(serde_json::to_string(&first_obj).unwrap().as_bytes());
     for rev in revwalk {
         let commit = repo.find_commit(rev.unwrap()).unwrap();
         let commit_tree = commit.tree().unwrap();
