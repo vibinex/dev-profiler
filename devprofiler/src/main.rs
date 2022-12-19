@@ -1,13 +1,18 @@
 use clap::Parser;
 use git2::{ Repository, Diff, Commit };
 use detect_lang;
-use std::path::Path;
+use std::path::{Path, Component};
 use serde::Serialize;
 use flate2::Compression;
 use flate2::write::GzEncoder;
 use std::fs::File;
 use std::io::BufWriter;
 use std::io::Write;
+use sha256::digest;
+use std::ffi::OsStr;
+
+// TODO - logging
+// TODO - error handling
 
 #[derive(Parser)]
 struct Cli {
@@ -27,7 +32,8 @@ struct DiffInfo {
 
 #[derive(Clone, Debug, Serialize)]
 struct DiffFileInfo {
-    filepath: String,
+    path_hash: String,
+    filename: String,
     v_language: String,
 }
 
@@ -48,12 +54,12 @@ impl CommitInfo {
         let toffset :i64 = commit.time().offset_minutes().into();
         let mut cparents :Vec<String>  = Vec::new();
         for c in commit.parents() {
-            cparents.push(c.id().to_string());
+            cparents.push(digest(c.id().to_string()));
         }
         Self {
-            commit_id: commit.id().to_string(),
-            author_name: commit.author().name().unwrap().to_string(),
-            author_email:commit.author().email().unwrap().to_string(),
+            commit_id: digest(commit.id().to_string()),
+            author_name: digest(commit.author().name().unwrap().to_string()),
+            author_email: digest(commit.author().email().unwrap().to_string()),
             ts_secs: tsecs,
             ts_offset_mins: toffset,
             parents: cparents,
@@ -90,7 +96,8 @@ impl CommitInfo {
 impl DiffFileInfo {
     fn new(path: &Path, lang: &String) -> Self {
         Self {
-            filepath: path.to_path_buf().into_os_string().into_string().unwrap(),
+            path_hash: digest(path.to_path_buf().into_os_string().into_string().unwrap()),
+            filename: path.file_name().unwrap().to_str().unwrap().to_string(),
             v_language: String::from(lang),
         }
     }
@@ -101,7 +108,7 @@ fn analyze_repo(arg_ref: &Cli) {
     let mut revwalk = repo.revwalk().unwrap();
     revwalk.push_head().unwrap();
     let file = File::create("devprofiler.json.gz").unwrap();
-    let mut bufw = BufWriter::new(file);
+    let bufw = BufWriter::new(file);
     let mut gze = GzEncoder::new(bufw, Compression::default());
     for rev in revwalk {
         let commit = repo.find_commit(rev.unwrap()).unwrap();
@@ -115,10 +122,9 @@ fn analyze_repo(arg_ref: &Cli) {
         let diff = repo.diff_tree_to_tree(Some(&commit_tree), Some(&parent_tree), None).unwrap();
         let cinfo = CommitInfo::new(&commit, &diff);
         let serialized = serde_json::to_string(&cinfo).unwrap();
-        println!("serialized = {}", serialized);
-        gze.write(serialized.as_bytes());
+        let res = gze.write(serialized.as_bytes());
     }
-    gze.finish();
+    let result = gze.finish();
 }
 
 fn main() {
