@@ -41,6 +41,7 @@ struct DiffFileInfo {
 #[derive(Clone, Debug, Serialize)]
 struct CommitInfo {
     commit_id: String,
+    repo_name: String,
     author_name: String,
     author_email: String,
     ts_secs: i64,
@@ -50,7 +51,7 @@ struct CommitInfo {
 }
 
 impl CommitInfo {
-    fn new(commit: &Commit, diff: &Diff) -> Self {
+    fn new(commit: &Commit, diff: &Diff, reponame: String) -> Self {
         let tsecs = commit.time().seconds();
         let toffset :i64 = commit.time().offset_minutes().into();
         let mut cparents :Vec<String>  = Vec::new();
@@ -59,6 +60,7 @@ impl CommitInfo {
         }
         Self {
             commit_id: digest(commit.id().to_string()),
+            repo_name: reponame,
             author_name: digest(commit.author().name().unwrap().to_string()),
             author_email: digest(commit.author().email().unwrap().to_string()),
             ts_secs: tsecs,
@@ -115,6 +117,8 @@ struct RunInfo {
 
 fn analyze_repo(arg_ref: &Cli) {
     let repo = Repository::discover(&arg_ref.path).unwrap();
+    let repodir = arg_ref.path.as_path();
+    let reponame = repodir.strip_prefix(repodir.parent().unwrap()).unwrap().as_os_str().to_str().unwrap_or_default().to_string();
     let mut revwalk = repo.revwalk().unwrap();
     revwalk.push_head().unwrap();
     let file = File::create("devprofiler.jsonl.gz").unwrap();
@@ -135,7 +139,7 @@ fn analyze_repo(arg_ref: &Cli) {
         }
         let parent_tree = parent.unwrap().tree().unwrap();
         let diff = repo.diff_tree_to_tree(Some(&commit_tree), Some(&parent_tree), None).unwrap();
-        let cinfo = CommitInfo::new(&commit, &diff);
+        let cinfo = CommitInfo::new(&commit, &diff, reponame.clone());
         let serialized = serde_json::to_string(&cinfo).unwrap();
         let res = writeln!(gze, "{}", serialized);
     }
