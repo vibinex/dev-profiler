@@ -117,14 +117,14 @@ fn analyze_repo(arg_ref: &Cli) {
     let repo = Repository::discover(&arg_ref.path).unwrap();
     let mut revwalk = repo.revwalk().unwrap();
     revwalk.push_head().unwrap();
-    let file = File::create("devprofiler.json.gz").unwrap();
+    let file = File::create("devprofiler.jsonl.gz").unwrap();
     let bufw = BufWriter::new(file);
     let mut gze = GzEncoder::new(bufw, Compression::default());
     let first_obj: RunInfo = RunInfo {
         aliases: vec![arg_ref.user.clone()],
         repos: vec![arg_ref.path.as_os_str().to_str().unwrap_or_default().to_string().clone()],
     };
-    gze.write(serde_json::to_string(&first_obj).unwrap().as_bytes());
+    let res = writeln!(gze, "{}", serde_json::to_string(&first_obj).unwrap());
     for rev in revwalk {
         let commit = repo.find_commit(rev.unwrap()).unwrap();
         let commit_tree = commit.tree().unwrap();
@@ -137,7 +137,7 @@ fn analyze_repo(arg_ref: &Cli) {
         let diff = repo.diff_tree_to_tree(Some(&commit_tree), Some(&parent_tree), None).unwrap();
         let cinfo = CommitInfo::new(&commit, &diff);
         let serialized = serde_json::to_string(&cinfo).unwrap();
-        let res = gze.write(serialized.as_bytes());
+        let res = writeln!(gze, "{}", serialized);
     }
     let result = gze.finish();
 }
