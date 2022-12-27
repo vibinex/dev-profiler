@@ -17,8 +17,8 @@ use std::ffi::OsStr;
 
 #[derive(Parser)]
 struct Cli {
-    /// user name/email or pattern
-    user: String,
+    /// user email
+    user_email: String,
     /// repository path
     path: std::path::PathBuf,
 }
@@ -115,7 +115,13 @@ struct RunInfo {
     repos: Vec<String>,
 }
 
+#[derive(Clone, Debug, Serialize)]
+struct ErrorInfo {
+    errors: Vec<String>
+}
+
 fn analyze_repo(arg_ref: &Cli) {
+    let errinfo = ErrorInfo {errors: Vec::new()};
     let repo = Repository::discover(&arg_ref.path).unwrap();
     let repodir = arg_ref.path.as_path();
     let reponame = repodir.strip_prefix(repodir.parent().unwrap()).unwrap().as_os_str().to_str().unwrap_or_default().to_string();
@@ -124,11 +130,12 @@ fn analyze_repo(arg_ref: &Cli) {
     let file = File::create("devprofiler.jsonl.gz").unwrap();
     let bufw = BufWriter::new(file);
     let mut gze = GzEncoder::new(bufw, Compression::default());
-    let first_obj: RunInfo = RunInfo {
-        aliases: vec![arg_ref.user.clone()],
+    let rinfo: RunInfo = RunInfo {
+        aliases: vec![digest(arg_ref.user_email.clone())],
         repos: vec![arg_ref.path.as_os_str().to_str().unwrap_or_default().to_string().clone()],
     };
-    let res = writeln!(gze, "{}", serde_json::to_string(&first_obj).unwrap());
+    let res1 = writeln!(gze, "{}", serde_json::to_string(&errinfo).unwrap());
+    let res2 = writeln!(gze, "{}", serde_json::to_string(&rinfo).unwrap());
     for rev in revwalk {
         let commit = repo.find_commit(rev.unwrap()).unwrap();
         let commit_tree = commit.tree().unwrap();
