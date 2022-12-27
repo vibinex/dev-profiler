@@ -131,7 +131,7 @@ fn analyze_repo(arg_ref: &Cli) {
     let bufw = BufWriter::new(file);
     let mut gze = GzEncoder::new(bufw, Compression::default());
     let rinfo: RunInfo = RunInfo {
-        aliases: vec![digest(arg_ref.user_email.clone())],
+        aliases: vec![arg_ref.user_email.clone()],
         repos: vec![arg_ref.path.as_os_str().to_str().unwrap_or_default().to_string().clone()],
     };
     let res1 = writeln!(gze, "{}", serde_json::to_string(&errinfo).unwrap());
