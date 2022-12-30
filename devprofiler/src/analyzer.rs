@@ -7,49 +7,53 @@ use std::path::Path;
 use std::error::Error;
 use std::collections::HashSet;
 use crate::writer::OutputWriter;
+use crate::observer::ErrorInfo;
 
 pub struct RepoAnalyzer {
     repo: Repository,
     path: PathBuf, 
-    // outputter: 
 }
 
 impl RepoAnalyzer {
-    pub fn new(path: PathBuf) -> Option<Self> {
-        let repo = Repository::discover(&path);
-        match repo.is_ok() {
-            true => Some( Self {
-                path,
-                repo: repo.expect("repo is ok, conditional check on block"),
-            }),
-            false => None
-        }
+    pub fn new(path: PathBuf) -> Result<RepoAnalyzer, Box<dyn Error>> {
+        let repo = Repository::discover(&path)?;
+        Ok(Self {
+            path,
+            repo: repo,
+        })
     }
 
-    pub fn analyze(&self, writer: &mut OutputWriter) -> Result<HashSet::<String>, Box<dyn Error>>{
-        let errinfo = ErrorInfo {errors: Vec::new()};
+    pub fn analyze(&self, writer: &mut OutputWriter, einfo: &mut ErrorInfo) 
+        -> Result<HashSet::<String>, Box<dyn Error>>{
         let mut aliases = HashSet::new();
         let mut revwalk = self.repo.revwalk()?;
         revwalk.push_head()?;
-
-        //outputter
-        // let _res1 = writeln!(gze, "{}", serde_json::to_string(&errinfo).unwrap());
-        // let res2 = writeln!(gze, "{}", serde_json::to_string(&rinfo).unwrap());
         for rev in revwalk {
-            if rev.is_ok() {
-                let objid = rev.expect("Checked, is ok");
-                let commit_res = self.repo.find_commit(objid);
-                if commit_res.is_ok() {
-                    let commit = commit_res.expect("Checked, is ok");
-                    aliases.insert(commit.author().email().unwrap_or_default().to_string());
-                    let cinfo = self.extract_commit_obj(&commit);
-                    let serialized = serde_json::to_string(&cinfo).unwrap_or_default();
-                    writer.writeln(serialized.as_str().as_ref());
-                    // let _res = writeln!(gze, "{}", serialized);
+            match rev {
+                Ok(objid) => {
+                    let commit_res = self.repo.find_commit(objid);
+                    match commit_res {
+                        Ok(commit) => {
+                            aliases.insert(commit.author().email().unwrap_or_default().to_string());
+                            let cinfo = self.extract_commit_obj(&commit);
+                            let serialized = serde_json::to_string(&cinfo).unwrap_or_default();
+                            match writer.writeln(serialized.as_str().as_ref()) {
+                                Ok(_) => {},
+                                Err(writer_err) => {
+                                    einfo.push(writer_err.to_string().as_str().as_ref());
+                                }
+                            }
+                        },
+                        Err(commit_err) => {
+                            einfo.push(commit_err.to_string().as_str().as_ref());
+                        }
+                    }
+                },
+                Err(rev_err) => {
+                    einfo.push(rev_err.to_string().as_str().as_ref());
                 }
             }
         }
-        // let _result = gze.finish();
         Ok(aliases)
     }
 
@@ -184,15 +188,4 @@ impl DiffFileInfo {
             v_language: lang.to_string().to_owned(),
         }
     }
-}
-
-// #[derive(Clone, Debug, Serialize)]
-// struct RunInfo {
-//     aliases: Vec<String>,
-//     repos: Vec<String>,
-// }
-
-#[derive(Clone, Debug, Serialize)]
-struct ErrorInfo {
-    errors: Vec<String>
 }
