@@ -1,6 +1,7 @@
 use clap::Parser;
 use git2::{ Repository, Diff, Commit };
 use detect_lang;
+use serde::de::value::MapAccessDeserializer;
 use std::path::Path;
 use serde::Serialize;
 use flate2::Compression;
@@ -10,6 +11,7 @@ use std::io::BufWriter;
 use std::io::Write;
 use sha256::digest;
 // use std::ffi::OsStr;
+use inquire::{ Text, MultiSelect };
 
 // TODO - logging
 // TODO - error handling
@@ -134,8 +136,8 @@ fn analyze_repo(arg_ref: &Cli) {
         aliases: vec![arg_ref.user_email.clone()],
         repos: vec![arg_ref.path.as_os_str().to_str().unwrap_or_default().to_string().clone()],
     };
-    let res1 = writeln!(gze, "{}", serde_json::to_string(&errinfo).unwrap());
-    let res2 = writeln!(gze, "{}", serde_json::to_string(&rinfo).unwrap());
+    let _res1 = writeln!(gze, "{}", serde_json::to_string(&errinfo).unwrap());
+    let _res2 = writeln!(gze, "{}", serde_json::to_string(&rinfo).unwrap());
     for rev in revwalk {
         let commit = repo.find_commit(rev.unwrap()).unwrap();
         let commit_tree = commit.tree().unwrap();
@@ -148,12 +150,40 @@ fn analyze_repo(arg_ref: &Cli) {
         let diff = repo.diff_tree_to_tree(Some(&commit_tree), Some(&parent_tree), None).unwrap();
         let cinfo = CommitInfo::new(&commit, &diff, reponame.clone());
         let serialized = serde_json::to_string(&cinfo).unwrap();
-        let res = writeln!(gze, "{}", serialized);
+        let _res = writeln!(gze, "{}", serialized);
     }
-    let result = gze.finish();
+    let _result = gze.finish();
 }
 
+fn show_options_to_select_on_Cli(options: &[&str], input: &str) {
+	loop {
+		let filtered_options: Vec<&str> = options
+            .iter()
+            .filter(|option| option.contains(input))
+            .cloned()
+            .collect();
+
+		if filtered_options.is_empty() {
+			println!("No options available");
+			return;
+		}
+
+		let selection = MultiSelect::new("Select options:", filtered_options);
+
+		// for option in selection {
+		// 	println!("Option {} selected", option + 1);
+		// }
+		let confirm_text = Text::new("Do you want to select more options? (y/n) ");
+		if !confirm_text
+			.with_default("n")
+		{
+			break;
+		}
+	}
+}
 fn main() {
     let args = Cli::parse();
+	let options = ["Option 1", "Option 2", "Option 3"];
+    let input = Text::new("Search for email : ").prompt().unwrap();
     analyze_repo(&args);
 }
