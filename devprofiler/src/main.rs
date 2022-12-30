@@ -25,9 +25,10 @@ fn main() {
     // let (pathvec, patherrs) = rscanner.scan();
     // println!("{:?}", pathvec);
     // println!("{:?}", patherrs);
-    let ranalyzer = RepoAnalyzer::new(args.path);
-    if ranalyzer.is_some() {
-        let res = ranalyzer.expect("Checked, is not none").analyze();
+    let ranalyzer_res = RepoAnalyzer::new(args.path);
+    if ranalyzer_res.is_some() {
+        let ranalyzer = ranalyzer_res.expect("Checked, is not none");
+        let res = ranalyzer.analyze();
         println!("{:?}", res.unwrap());
     }
 }

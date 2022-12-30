@@ -1,4 +1,4 @@
-use git2::{ Repository, Diff, Commit, Oid };
+use git2::{ Repository, Diff, Commit };
 use detect_lang;
 use serde::Serialize;
 use flate2::Compression;
@@ -10,6 +10,7 @@ use sha256::digest;
 use std::path::PathBuf;
 use std::path::Path;
 use std::error::Error;
+use std::collections::HashSet;
 
 pub struct RepoAnalyzer {
     repo: Repository,
@@ -29,8 +30,9 @@ impl RepoAnalyzer {
         }
     }
 
-    pub fn analyze(&self) -> Result<(), Box<dyn Error>>{
+    pub fn analyze(&self) -> Result<HashSet::<String>, Box<dyn Error>>{
         let errinfo = ErrorInfo {errors: Vec::new()};
+        let mut aliases = HashSet::new();
         let mut revwalk = self.repo.revwalk()?;
         revwalk.push_head()?;
         // outputter
@@ -45,20 +47,21 @@ impl RepoAnalyzer {
         //outputter
         let _res1 = writeln!(gze, "{}", serde_json::to_string(&errinfo).unwrap());
         // let res2 = writeln!(gze, "{}", serde_json::to_string(&rinfo).unwrap());
-
         for rev in revwalk {
             if rev.is_ok() {
-                let commit_str = self.extract_commit_obj(rev.expect("Checked, is ok"));
-                if commit_str.is_ok() {
-                    let _res = writeln!(gze, "{}", commit_str.expect("Checked, is ok"));
-                }
-                else {
-                    continue;
+                let objid = rev.expect("Checked, is ok");
+                let commit_res = self.repo.find_commit(objid);
+                if commit_res.is_ok() {
+                    let commit = commit_res.expect("Checked, is ok");
+                    aliases.insert(commit.author().email().unwrap_or_default().to_string());
+                    let cinfo = self.extract_commit_obj(&commit);
+                    let serialized = serde_json::to_string(&cinfo).unwrap_or_default();
+                    let _res = writeln!(gze, "{}", serialized);
                 }
             }
         }
         let _result = gze.finish();
-        Ok(())
+        Ok(aliases)
     }
 
     fn extract_reponame(&self) -> &str{
@@ -68,12 +71,10 @@ impl RepoAnalyzer {
             .as_os_str().to_str().expect("None only if path is empty").as_ref()
     }
 
-    fn extract_commit_obj(&self, objid: Oid) -> Result<String, Box<dyn Error>> {
-        let commit = self.repo.find_commit(objid)?;
-        let diff = self.extract_diff(&commit);
-        let cinfo = CommitInfo::new(&commit, &diff, self.extract_reponame());
-        let serialized = serde_json::to_string(&cinfo).unwrap_or_default();
-        Ok(serialized)
+    fn extract_commit_obj(&self, commit: &Commit) -> CommitInfo {
+        let diff = self.extract_diff(commit);
+        let cinfo = CommitInfo::new(commit, &diff, self.extract_reponame());
+        cinfo
     }
 
     fn extract_diff(&self, commit: &Commit) -> Option<Diff> {
@@ -196,11 +197,11 @@ impl DiffFileInfo {
     }
 }
 
-#[derive(Clone, Debug, Serialize)]
-struct RunInfo {
-    aliases: Vec<String>,
-    repos: Vec<String>,
-}
+// #[derive(Clone, Debug, Serialize)]
+// struct RunInfo {
+//     aliases: Vec<String>,
+//     repos: Vec<String>,
+// }
 
 #[derive(Clone, Debug, Serialize)]
 struct ErrorInfo {
