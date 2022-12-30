@@ -9,7 +9,7 @@ use std::fs::File;
 use std::io::BufWriter;
 use std::io::Write;
 use sha256::digest;
-use std::ffi::OsStr;
+// use std::ffi::OsStr;
 
 // TODO - logging
 // TODO - error handling

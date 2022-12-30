@@ -23,5 +23,6 @@ flate2 = "1.0"
 sha2 = "0.10"
 base64ct = "1.5.3"
 sha256 = "1.1.1"
+openssl = { version = "0.10", features = ["vendored"] }
 
 # todo - check all lib licences
