@@ -1,7 +1,6 @@
 use clap::Parser;
 use git2::{ Repository, Diff, Commit };
 use detect_lang;
-use serde::de::value::MapAccessDeserializer;
 use std::path::Path;
 use serde::Serialize;
 use flate2::Compression;
@@ -11,7 +10,7 @@ use std::io::BufWriter;
 use std::io::Write;
 use sha256::digest;
 // use std::ffi::OsStr;
-use inquire::{ Text, MultiSelect };
+use dialoguer::{ MultiSelect, Input };
 
 // TODO - logging
 // TODO - error handling
@@ -155,7 +154,7 @@ fn analyze_repo(arg_ref: &Cli) {
     let _result = gze.finish();
 }
 
-fn show_options_to_select_on_Cli(options: &[&str], input: &str) {
+fn show_options_to_select_on_cli(options: &[&str], input: &str) {
 	loop {
 		let filtered_options: Vec<&str> = options
             .iter()
@@ -168,22 +167,31 @@ fn show_options_to_select_on_Cli(options: &[&str], input: &str) {
 			return;
 		}
 
-		let selection = MultiSelect::new("Select options:", filtered_options);
+		let selection: Vec<usize> = MultiSelect::new()
+            .items(&filtered_options)
+            .interact()
+            .unwrap();
 
-		// for option in selection {
-		// 	println!("Option {} selected", option + 1);
-		// }
-		let confirm_text = Text::new("Do you want to select more options? (y/n) ");
-		if !confirm_text
-			.with_default("n")
-		{
-			break;
+		for option in selection {
+			println!("Option {} selected", option + 1);
 		}
+		let input = Input::new()
+			.with_prompt("Do you want to select more options? (y/n) ")
+			.default("n".to_string())
+			.interact();
+        if input.is_ok(){
+            break;
+        }
 	}
 }
 fn main() {
     let args = Cli::parse();
-	let options = ["Option 1", "Option 2", "Option 3"];
-    let input = Text::new("Search for email : ").prompt().unwrap();
+	let options = ["Option 1", "Option 2", "Option 3"]; //hardcoded the values right now. We will be using emails and repo options instead.
+    let input: String = Input::new()
+		.with_prompt("Enter search term ")
+		.interact()
+		.unwrap();
+		
+	show_options_to_select_on_cli(&options, &input);
     analyze_repo(&args);
 }
