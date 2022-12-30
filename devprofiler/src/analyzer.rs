@@ -1,20 +1,16 @@
 use git2::{ Repository, Diff, Commit };
 use detect_lang;
 use serde::Serialize;
-use flate2::Compression;
-use flate2::write::GzEncoder;
-use std::fs::File;
-use std::io::BufWriter;
-use std::io::Write;
 use sha256::digest;
 use std::path::PathBuf;
 use std::path::Path;
 use std::error::Error;
 use std::collections::HashSet;
+use crate::writer::OutputWriter;
 
 pub struct RepoAnalyzer {
     repo: Repository,
-    path: PathBuf,
+    path: PathBuf, 
     // outputter: 
 }
 
@@ -30,22 +26,14 @@ impl RepoAnalyzer {
         }
     }
 
-    pub fn analyze(&self) -> Result<HashSet::<String>, Box<dyn Error>>{
+    pub fn analyze(&self, writer: &mut OutputWriter) -> Result<HashSet::<String>, Box<dyn Error>>{
         let errinfo = ErrorInfo {errors: Vec::new()};
         let mut aliases = HashSet::new();
         let mut revwalk = self.repo.revwalk()?;
         revwalk.push_head()?;
-        // outputter
-        let file = File::create("devprofile.jsonl.gz").unwrap();
-        let bufw = BufWriter::new(file);
-        let mut gze = GzEncoder::new(bufw, Compression::default());
 
-        // let rinfo: RunInfo = RunInfo {
-        //     aliases: vec![self.email.clone()],
-        //     repos: vec![self.path.as_os_str().to_str().unwrap_or_default().to_string().clone()],
-        // };
         //outputter
-        let _res1 = writeln!(gze, "{}", serde_json::to_string(&errinfo).unwrap());
+        // let _res1 = writeln!(gze, "{}", serde_json::to_string(&errinfo).unwrap());
         // let res2 = writeln!(gze, "{}", serde_json::to_string(&rinfo).unwrap());
         for rev in revwalk {
             if rev.is_ok() {
@@ -56,11 +44,12 @@ impl RepoAnalyzer {
                     aliases.insert(commit.author().email().unwrap_or_default().to_string());
                     let cinfo = self.extract_commit_obj(&commit);
                     let serialized = serde_json::to_string(&cinfo).unwrap_or_default();
-                    let _res = writeln!(gze, "{}", serialized);
+                    writer.writeln(serialized.as_str().as_ref());
+                    // let _res = writeln!(gze, "{}", serialized);
                 }
             }
         }
-        let _result = gze.finish();
+        // let _result = gze.finish();
         Ok(aliases)
     }
 
