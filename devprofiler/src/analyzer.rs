@@ -15,10 +15,11 @@ pub struct RepoAnalyzer {
 }
 
 impl RepoAnalyzer {
-    pub fn new(path: PathBuf) -> Result<RepoAnalyzer, Box<dyn Error>> {
+    pub fn new(path_str: String) -> Result<RepoAnalyzer, Box<dyn Error>> {
+        let path = Path::new(&path_str);
         let repo = Repository::discover(&path)?;
         Ok(Self {
-            path,
+            path: path.to_owned(),
             repo: repo,
         })
     }
