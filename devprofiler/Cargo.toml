@@ -24,6 +24,6 @@ sha2 = "0.10"
 base64ct = "1.5.3"
 sha256 = "1.1.1"
 walkdir = "2"
-dialoguer = "0.10.2"
+inquire = "0.5.2"
 
 # todo - check all lib licences

@@ -11,9 +11,9 @@ impl RepoScanner {
         Self { scanpath }
     }
 
-    pub fn scan(&self, einfo: &mut ErrorInfo) -> Vec<PathBuf>{
+    pub fn scan(&self, einfo: &mut ErrorInfo) -> Vec<String>{
         let walker = WalkDir::new(self.scanpath.as_path()).into_iter();
-        let mut repo_paths = Vec::<PathBuf>::new();
+        let mut repo_paths = Vec::<String>::new();
         for entry in walker.filter_map(|elem| {
             if elem.is_err() {
                 einfo.push(elem.err().expect("Checked, is err")
@@ -30,7 +30,8 @@ impl RepoScanner {
                 repo_paths.push(
                     path.parent()
                     .expect("None only when path = /")
-                    .to_owned());
+                    .to_str().expect("None only when path = /")
+                    .to_string());
             }
         }
         repo_paths
