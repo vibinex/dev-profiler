@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 use walkdir::WalkDir;
-use crate::observer::ErrorInfo;
+use crate::observer::RuntimeInfo;
 
 pub struct RepoScanner {
     scanpath: PathBuf
@@ -11,7 +11,7 @@ impl RepoScanner {
         Self { scanpath }
     }
 
-    pub fn scan(&self, einfo: &mut ErrorInfo) -> Vec<String>{
+    pub fn scan(&self, einfo: &mut RuntimeInfo) -> Vec<String>{
         let walker = WalkDir::new(self.scanpath.as_path()).into_iter();
         let mut repo_paths = Vec::<String>::new();
         for entry in walker.filter_map(|elem| {

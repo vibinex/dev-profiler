@@ -7,7 +7,7 @@ use std::path::Path;
 use std::error::Error;
 use std::collections::HashSet;
 use crate::writer::OutputWriter;
-use crate::observer::ErrorInfo;
+use crate::observer::RuntimeInfo;
 
 pub struct RepoAnalyzer {
     repo: Repository,
@@ -24,7 +24,7 @@ impl RepoAnalyzer {
         })
     }
 
-    pub fn analyze(&self, writer: &mut OutputWriter, einfo: &mut ErrorInfo) 
+    pub fn analyze(&self, writer: &mut OutputWriter, einfo: &mut RuntimeInfo) 
         -> Result<HashSet::<String>, Box<dyn Error>>{
         let mut aliases = HashSet::new();
         let mut revwalk = self.repo.revwalk()?;
