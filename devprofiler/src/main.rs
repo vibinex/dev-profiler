@@ -9,8 +9,13 @@ use crate::observer::ErrorInfo;
 mod scanner;
 use crate::scanner::RepoScanner;
 use std::path::Path;
+use serde::Serialize;
 use std::collections::HashSet;
 
+#[derive(Debug, Serialize, Default)]
+struct UserAlias {
+	alias: Vec::<String>
+}
 
 fn main() {
 	match UserInput::scan_path() {
@@ -50,13 +55,25 @@ fn main() {
 							// TODO - display on ui
 							einfo.push(err_line);
 						}
-						let _res = einfo.write_err(writer);
-						let _res2 = writer.finish();
 						let alias_vec = all_aliases.into_iter().collect();
 						match UserInput::alias_selector(alias_vec) {
-							Ok(user_aliases) => { println!("User aliases: {:?}", user_aliases); }
-							Err(error) => { eprintln!("Unable to process user aliases : {:?}", error); }
+							Ok(user_aliases) => {
+								let alias_obj = UserAlias{ alias: user_aliases };
+								let alias_str = serde_json::to_string(&alias_obj).unwrap_or_default();
+								match writer.writeln(alias_str.as_str().as_ref()) {
+									Ok(_) => {},
+									Err(writer_err) => {
+										einfo.push(writer_err.to_string().as_str().as_ref());
+									}
+								}
+							 }
+							Err(error) => { 
+								eprintln!("Unable to process user aliases : {:?}", error);
+								einfo.push(error.to_string().as_str().as_ref()); 
+							}
 						}
+						let _res = einfo.write_err(writer);
+						let _res2 = writer.finish();
 					},
 					Err(error) => {
 						eprintln!("Unable to process repository selection : {:?}", error);
