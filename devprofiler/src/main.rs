@@ -5,7 +5,7 @@ use crate::analyzer::RepoAnalyzer;
 mod writer;
 use crate::writer::OutputWriter;
 mod observer;
-use crate::observer::ErrorInfo;
+use crate::observer::RuntimeInfo;
 mod scanner;
 use crate::scanner::RepoScanner;
 use std::path::Path;
@@ -23,7 +23,7 @@ fn main() {
 			let writer_result = OutputWriter::new();
 			if writer_result.is_ok() {
 				let writer = &mut writer_result.expect("Checked, is ok");
-				let einfo = &mut ErrorInfo::new();
+				let einfo = &mut RuntimeInfo::new();
 				let scan_pathbuf = Path::new(&scan_path_str).to_path_buf();
 				let rscanner = RepoScanner::new(scan_pathbuf);
 				let pathsvec = rscanner.scan(einfo);
@@ -72,7 +72,7 @@ fn main() {
 								einfo.push(error.to_string().as_str().as_ref()); 
 							}
 						}
-						let _res = einfo.write_err(writer);
+						let _res = einfo.write_runtime_info(writer);
 						let _res2 = writer.finish();
 					},
 					Err(error) => {
