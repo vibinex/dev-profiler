@@ -23,7 +23,7 @@ impl RuntimeInfo {
             logs: Vec::<String>::new(),
         }
     }
-    pub fn push(&mut self, estr: &str) {
+    pub fn record_err(&mut self, estr: &str) {
         self.errors.push(estr.to_string());
     }
     pub fn write_runtime_info(&self, writer: &mut OutputWriter) -> Result<(), std::io::Error>{
