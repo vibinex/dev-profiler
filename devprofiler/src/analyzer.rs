@@ -15,8 +15,8 @@ pub struct RepoAnalyzer {
 }
 
 impl RepoAnalyzer {
-    pub fn new(path_str: String) -> Result<RepoAnalyzer, Box<dyn Error>> {
-        let path = Path::new(&path_str);
+    pub fn new(path_str: &str) -> Result<RepoAnalyzer, Box<dyn Error>> {
+        let path = Path::new(path_str);
         let repo = Repository::discover(&path)?;
         Ok(Self {
             path: path.to_owned(),
@@ -41,17 +41,17 @@ impl RepoAnalyzer {
                             match writer.writeln(serialized.as_str().as_ref()) {
                                 Ok(_) => {},
                                 Err(writer_err) => {
-                                    einfo.push(writer_err.to_string().as_str().as_ref());
+                                    einfo.record_err(writer_err.to_string().as_str().as_ref());
                                 }
                             }
                         },
                         Err(commit_err) => {
-                            einfo.push(commit_err.to_string().as_str().as_ref());
+                            einfo.record_err(commit_err.to_string().as_str().as_ref());
                         }
                     }
                 },
                 Err(rev_err) => {
-                    einfo.push(rev_err.to_string().as_str().as_ref());
+                    einfo.record_err(rev_err.to_string().as_str().as_ref());
                 }
             }
         }

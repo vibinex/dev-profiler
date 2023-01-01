@@ -16,7 +16,7 @@ impl RepoScanner {
         let mut repo_paths = Vec::<String>::new();
         for entry in walker.filter_map(|elem| {
             if elem.is_err() {
-                einfo.push(elem.err().expect("Checked, is err")
+                einfo.record_err(elem.err().expect("Checked, is err")
                             .to_string().as_str().as_ref());
                 None
             }
