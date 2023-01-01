@@ -81,7 +81,7 @@ fn main() {
 					let einfo = &mut RuntimeInfo::new();
 					let scan_pathbuf = Path::new(&scan_path_str).to_path_buf();
 					let rscanner = RepoScanner::new(scan_pathbuf);
-					let pathsvec = rscanner.scan(einfo);
+					let pathsvec = rscanner.scan(einfo, writer_mut);
 					match UserInput::repo_selection(pathsvec) {
 						Ok(user_paths) => {
 							let alias_vec = process_repos(user_paths, einfo, writer_mut);
