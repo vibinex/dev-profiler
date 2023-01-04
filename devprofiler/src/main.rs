@@ -12,6 +12,8 @@ use std::process;
 use std::path::Path;
 use serde::Serialize;
 use std::collections::HashSet;
+use std::io::Write;
+use std::io;
 
 #[derive(Debug, Serialize, Default)]
 struct UserAlias {
@@ -21,7 +23,14 @@ struct UserAlias {
 fn process_repos(user_paths: Vec::<String>, einfo: &mut RuntimeInfo, writer: &mut OutputWriter) -> Vec::<String> {
 	let mut valid_repo = 0;
 	let mut all_aliases = HashSet::<String>::new();
+	let num_user_path = user_paths.len();
+	let mut count = 0;
+	// TODO - optimize count and iterating of vector user_path, get index in for loop
+	println!("");
 	for p in user_paths {
+		count += 1;
+		print!("Scanning [{count}/{num_user_path}] \r");
+		let _res = io::stdout().flush();
 		let ranalyzer_res = RepoAnalyzer::new(p.as_str().as_ref());
 		match ranalyzer_res {
 			Ok(ranalyzer) => {
@@ -42,6 +51,7 @@ fn process_repos(user_paths: Vec::<String>, einfo: &mut RuntimeInfo, writer: &mu
 			}
 		}
 	}
+	println!("");
 	if valid_repo == 0 {
 		let err_line = "Unable to parse any provided repo(s)";
 		eprintln!("{err_line}");
@@ -62,12 +72,16 @@ fn process_aliases(alias_vec: Vec::<String>, einfo: &mut RuntimeInfo, writer: &m
 				Err(writer_err) => {
 					eprintln!("Unable to record user aliases in output file : {writer_err}");
 					einfo.record_err(writer_err.to_string().as_str().as_ref());
+					let _res = writer.finish(); // result doesn't matter since already in error
+					process::exit(1);
 				}
 			}
 		 }
 		Err(error) => { 
 			eprintln!("Unable to process user aliases : {:?}", error);
-			einfo.record_err(error.to_string().as_str().as_ref()); 
+			einfo.record_err(error.to_string().as_str().as_ref());
+			let _res = writer.finish(); // result doesn't matter since already in error
+			process::exit(1); 
 		}
 	}
 }
@@ -88,7 +102,9 @@ fn main() {
 							process_aliases(alias_vec, einfo, writer_mut);
 							let _res = einfo.write_runtime_info(writer_mut);
 							match writer.finish() {
-								Ok(_) => {},
+								Ok(_) => {
+									println!("Profile generated as devprofile.jsonl.gz, proceed to https://devprofiler.tech/upload to upload!");
+								},
 								Err(error) => {
 									eprintln!("Unable to write to output : {error}");
 								}
