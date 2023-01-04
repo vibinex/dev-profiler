@@ -15,7 +15,8 @@ impl UserInput {
 
     pub fn repo_selection(options: Vec::<String>) -> InquireResult<Vec::<String>>{
         MultiSelect::new(
-            "Select relevant repo(s)", options)
+            (format!("Select relevant repo(s) out of {} repo(s)", options.len())).as_str(), 
+            options)
             .with_validator(|a: &[ListOption<&String>]| {
                 if a.len() < 1 {
                     return Ok(Validation::Invalid("Please select at least one repo".into()));
@@ -27,7 +28,8 @@ impl UserInput {
 
     pub fn alias_selector(options: Vec::<String>) -> InquireResult<Vec::<String>>{
         MultiSelect::new(
-            "Select your email aliases", options)
+            (format!("Select your email alias(es) out of {} alias(es)", options.len())).as_str(),
+             options)
             .with_validator(|a: &[ListOption<&String>]| {
                 if a.len() < 1 {
                     return Ok(Validation::Invalid("Please select at least one alias".into()));
