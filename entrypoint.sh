@@ -1,3 +1,4 @@
 #!/bin/sh -l
 
-devprofiler
+devprofiler -- docker
+curl https://gcscruncsql-k7jns52mtq-el.a.run.app/insert
