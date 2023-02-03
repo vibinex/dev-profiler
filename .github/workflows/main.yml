@@ -3,4 +3,7 @@ jobs:
   profile:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/dev-profiler@v0
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Profiler
+        uses: ./ # Uses an action in the root directory
