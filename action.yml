@@ -1,15 +1,13 @@
-on: [push]
-
-jobs:
-  devprofiler:
-    runs-on: ubuntu-latest
-    name: Analyze repository and extract metadata
-    steps:
-      - name: Hello world action step
-        id: hello
-        uses: actions/hello-world-docker-action@v2
-        with:
-          who-to-greet: 'Mona the Octocat'
-      # Use the output from the `hello` step
-      - name: Get the output time
-        run: echo "The time was ${{ steps.hello.outputs.time }}"
+name: 'Repository Profiler'
+description: 'Extracts insights from Repository code'
+runs-on: ubuntu-latest
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout repository
+      id: checkout
+      uses: actions/checkout@v3
+    - name: Generate profile
+      runs:
+        using: 'docker'
+        image: 'Dockerfile'
