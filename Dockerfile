@@ -2,6 +2,7 @@
 FROM ubuntu:latest
 
 RUN apt update && apt install curl -y
+RUN apt install -y git
 ADD https://storage.googleapis.com/devprofiler-prod/Releases/v0.1.1/linux/devprofiler_0.1.1_amd64.deb.gz /tmp
 RUN gunzip /tmp/devprofiler_0.1.1_amd64.deb.gz && apt install /tmp/devprofiler_0.1.1_amd64.deb -y
 
