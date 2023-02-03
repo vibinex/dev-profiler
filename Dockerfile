@@ -8,7 +8,7 @@ RUN gunzip /tmp/devprofiler_0.1.1_amd64.deb.gz && apt install /tmp/devprofiler_0
 # Copies your code file from your action repository to the filesystem path `/` of the container
 COPY entrypoint.sh /root/entrypoint.sh
 RUN chmod +x /root/entrypoint.sh
-COPY code /root/code
+COPY /github/workspace /root/code
 RUN chmod +r /root/code
 
 # Code file to execute when the docker container starts up (`entrypoint.sh`)
