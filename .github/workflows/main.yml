@@ -1,0 +1,6 @@
+on: [push]
+jobs:
+  profile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/dev-profiler@v0
