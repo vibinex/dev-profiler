@@ -1,13 +1,5 @@
 name: 'Repository Profiler'
 description: 'Extracts insights from Repository code'
-runs-on: ubuntu-latest
 runs:
-  using: "composite"
-  steps:
-    - name: Checkout repository
-      id: checkout
-      uses: actions/checkout@v3
-    - name: Generate profile
-      runs:
-        using: 'docker'
-        image: 'Dockerfile'
+  using: 'docker'
+  image: 'Dockerfile'
