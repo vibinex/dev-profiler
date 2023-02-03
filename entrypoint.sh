@@ -1,8 +1,7 @@
 #!/bin/sh -l
 
+git config --global --add safe.directory /github/workspace
 devprofiler -- docker
-ls /home
-ls /devprofiler
 
 
 timestamp=$(date +%s)
