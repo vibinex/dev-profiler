@@ -6,7 +6,7 @@ ADD https://storage.googleapis.com/devprofiler-prod/Releases/v0.1.1/linux/devpro
 RUN gunzip /tmp/devprofiler_0.1.1_amd64.deb.gz && apt install /tmp/devprofiler_0.1.1_amd64.deb -y
 
 # Copies your code file from your action repository to the filesystem path `/` of the container
-COPY entrypoint.sh /entrypoint.sh
+COPY entrypoint.sh /root/entrypoint.sh
 RUN chmod +x entrypoint.sh
 
 # Code file to execute when the docker container starts up (`entrypoint.sh`)
