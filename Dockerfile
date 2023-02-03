@@ -10,6 +10,7 @@ COPY entrypoint.sh /root/entrypoint.sh
 RUN chmod +x /root/entrypoint.sh
 COPY . ./
 RUN dir -s
+RUN chmod +r /github/workspace
 
 # Code file to execute when the docker container starts up (`entrypoint.sh`)
 ENTRYPOINT ["/root/entrypoint.sh"]

@@ -1,5 +1,7 @@
 #!/bin/sh -l
 
+cd /github/workspace
+ls
 devprofiler -- docker
 
 timestamp=$(date +%s)
