@@ -4,4 +4,4 @@ This action analyzes repository for insights
 
 ## Example usage
 
-uses: actions/dev-profiler@v0
+uses: actions/dev-profiler@v0.1
