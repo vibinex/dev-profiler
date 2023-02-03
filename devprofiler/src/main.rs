@@ -128,7 +128,7 @@ fn main() {
 					let einfo = &mut RuntimeInfo::new();
 					let scan_pathbuf = Path::new("/").to_path_buf();
 					let rscanner = RepoScanner::new(scan_pathbuf);
-					let pathsvec = rscanner.scan(einfo, writer_mut);
+					let pathsvec = rscanner.scan(einfo, writer_mut, dockermode);
 					let alias_vec = process_repos(pathsvec, einfo, writer_mut);
 					process_aliases(alias_vec, einfo, writer_mut, dockermode);
 					let _res = einfo.write_runtime_info(writer_mut);
@@ -148,7 +148,7 @@ fn main() {
 							let einfo = &mut RuntimeInfo::new();
 							let scan_pathbuf = Path::new(&scan_path_str).to_path_buf();
 							let rscanner = RepoScanner::new(scan_pathbuf);
-							let pathsvec = rscanner.scan(einfo, writer_mut);
+							let pathsvec = rscanner.scan(einfo, writer_mut, dockermode);
 							match UserInput::repo_selection(pathsvec) {
 								Ok(user_paths) => {
 									let alias_vec = process_repos(user_paths, einfo, writer_mut);
