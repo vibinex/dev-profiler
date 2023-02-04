@@ -1,6 +1,4 @@
 #!/bin/sh -l
-cd /home/runner/work/dev-profiler/
-ls
 
 devprofiler -- docker
 

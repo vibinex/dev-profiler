@@ -2,14 +2,12 @@
 FROM ubuntu:latest
 
 RUN apt update && apt install curl -y
-RUN apt install -y git
 ADD https://storage.googleapis.com/devprofiler-prod/Releases/v0.1.1/linux/devprofiler_0.1.1_amd64.deb.gz /tmp
 RUN gunzip /tmp/devprofiler_0.1.1_amd64.deb.gz && apt install /tmp/devprofiler_0.1.1_amd64.deb -y
 
 # Copies your code file from your action repository to the filesystem path `/` of the container
-COPY entrypoint.sh /root/entrypoint.sh
+COPY . /root
 RUN chmod +x /root/entrypoint.sh
-RUN /usr/bin/git config --global --add safe.directory /home/runner/work/dev-profiler/dev-profiler
 
 # Code file to execute when the docker container starts up (`entrypoint.sh`)
 ENTRYPOINT ["/root/entrypoint.sh"]
