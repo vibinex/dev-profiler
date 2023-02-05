@@ -7,9 +7,10 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      - name: Org action checkout
+      - name: Repo-profiler action checkout
         uses: actions/checkout@v3
         with:
           repository: Alokit-Innovations/repo-profiler
-      - name: Repo-profiler action
-        uses: ./
+          path: ./.github/actions/repo-profiler
+      - name: Run Repo-profiler action
+        uses: ./.github/actions/repo-profiler/repo-profiler
