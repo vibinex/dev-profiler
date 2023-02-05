@@ -13,4 +13,4 @@ jobs:
           repository: Alokit-Innovations/repo-profiler
           path: repo-profiler
       - name: Repo Profiler
-        uses: ./
+        uses: ./repo-profiler
