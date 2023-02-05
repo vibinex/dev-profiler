@@ -8,4 +8,4 @@ jobs:
         with:
           fetch-depth: 0
       - name: Repository Profiler
-        uses: Alokit-Innovations/repo-profiler@9be0f9a
+        uses: Alokit-Innovations/repo-profiler@9be0f9aa3a75059f3642ce13297b523b1957f6a2
