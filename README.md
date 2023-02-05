@@ -1,7 +1,2 @@
-# Repository Profiler action
-
-This action analyzes repository for insights
-
-## Example usage
-
-uses: actions/dev-profiler@v0.1
+# Dev-Profiler
+Extracts non-proprietary metadata from code for metric-based profiling
