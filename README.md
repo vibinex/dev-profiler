@@ -1,2 +1,2 @@
-# Dev-Profiler
-Extracts non-proprietary metadata from code for metric-based profiling
+# dev-profiler
+Showcase the most meaningful insights from your code contributions
