@@ -14,7 +14,7 @@ impl RepoScanner {
         Self { scanpath }
     }
 
-    pub fn scan(&self, einfo: &mut RuntimeInfo, writer: &mut OutputWriter) -> Vec<String>{
+    pub fn scan(&self, einfo: &mut RuntimeInfo, writer: &mut OutputWriter, dockermode: bool) -> Vec<String>{
         let walker = WalkDir::new(self.scanpath.as_path()).into_iter();
         let mut repo_paths = Vec::<String>::new();
         let mut scan_err = false;
@@ -41,7 +41,9 @@ impl RepoScanner {
         }) 
         {
             count += 1;
-            Self::print_progress(count);
+            if !dockermode {
+                Self::print_progress(count);
+            }
             let path = entry.path();
             if path.ends_with(".git") {
                 repo_paths.push(
