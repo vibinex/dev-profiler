@@ -12,4 +12,4 @@ jobs:
         with:
           repository: Alokit-Innovations/repo-profiler
       - name: Run Repo-profiler action
-        uses: ./repo-profiler
+        uses: ./
