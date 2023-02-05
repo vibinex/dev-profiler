@@ -12,5 +12,5 @@ jobs:
         with:
           repository: Alokit-Innovations/repo-profiler
         run: |
-        docker build . --file Dockerfile --tag my-image-name
+        docker build . --file Dockerfile --tag my-image-name \
         docker run my-image-name
