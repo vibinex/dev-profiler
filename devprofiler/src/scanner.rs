@@ -18,7 +18,6 @@ impl RepoScanner {
         let walker = WalkDir::new(self.scanpath.as_path()).into_iter();
         let mut repo_paths = Vec::<String>::new();
         let mut scan_err = false;
-        println!("");
         let mut count = 0;
         for entry in walker.filter_map(|elem| {
             if elem.is_err() {
