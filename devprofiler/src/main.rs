@@ -15,11 +15,14 @@ use std::collections::HashSet;
 use std::io::Write;
 use std::io;
 use clap::Parser;
+use std::path::PathBuf;
 
 #[derive(Parser)]
 struct Cli {
     /// Specify arg parsing mode for cli
-    argmode: Option<String>
+    argmode: Option<String>,
+	/// path scanned for repositories
+    path: Option<PathBuf>,
 }
 
 #[derive(Debug, Serialize, Default)]
@@ -126,7 +129,10 @@ fn main() {
 				true => {
 					let writer_mut: &mut OutputWriter = &mut writer;
 					let einfo = &mut RuntimeInfo::new();
-					let scan_pathbuf = Path::new("/").to_path_buf();
+					let scan_pathbuf = match args.path {
+						Some(scan_pathbuf) => scan_pathbuf,
+						None => Path::new("/").to_path_buf()
+					};
 					let rscanner = RepoScanner::new(scan_pathbuf);
 					let pathsvec = rscanner.scan(einfo, writer_mut, dockermode);
 					let alias_vec = process_repos(pathsvec, einfo, writer_mut);
