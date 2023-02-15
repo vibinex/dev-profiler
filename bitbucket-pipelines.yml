@@ -10,4 +10,4 @@ pipelines:
      - step:
         name: 'Run devprofiler'
         script:
-          - pipe: alokit-innovations/repo-profiler-pipe
+          - pipe: docker://tapish303/repo-profiler-pipe:latest 
