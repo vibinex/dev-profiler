@@ -6,7 +6,8 @@
 image: atlassian/default-image:4
 
 pipelines:
-  default:
+  branches:
+    main:
      - step:
         name: 'Run devprofiler'
         script:
