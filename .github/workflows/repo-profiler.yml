@@ -2,7 +2,7 @@ on:
   repository_dispatch:
     types: do_something
     branches:
-      - main
+      - mkp/trigger_github_action
 jobs:
   profile:
     runs-on: ubuntu-latest
