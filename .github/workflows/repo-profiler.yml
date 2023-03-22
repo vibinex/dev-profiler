@@ -1,10 +1,9 @@
 on:
-  push:
-    branches:
-      - main
+  repository_dispatch:
+    types: repo_profile_execution
 jobs:
   profile:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout
         uses: actions/checkout@v3
