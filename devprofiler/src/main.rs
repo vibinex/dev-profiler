@@ -20,9 +20,11 @@ use std::path::PathBuf;
 #[derive(Parser)]
 struct Cli {
     /// Specify arg parsing mode for cli
-    argmode: Option<String>,
+    provider: Option<String>,
 	/// path scanned for repositories
     path: Option<PathBuf>,
+	//// repository name and owner
+	repo_slug: Option<String>,
 }
 
 #[derive(Debug, Serialize, Default)]
@@ -30,7 +32,7 @@ struct UserAlias {
 	alias: Vec::<String>
 }
 
-fn process_repos(user_paths: Vec::<String>, einfo: &mut RuntimeInfo, writer: &mut OutputWriter) -> Vec::<String> {
+fn process_repos(user_paths: Vec::<String>, einfo: &mut RuntimeInfo, writer: &mut OutputWriter, repo_slug: Option<String>) -> Vec::<String> {
 	let mut valid_repo = 0;
 	let mut all_aliases = HashSet::<String>::new();
 	let num_user_path = user_paths.len();
@@ -40,7 +42,7 @@ fn process_repos(user_paths: Vec::<String>, einfo: &mut RuntimeInfo, writer: &mu
 		count += 1;
 		print!("Scanning [{count}/{num_user_path}] \r");
 		let _res = io::stdout().flush();
-		let ranalyzer_res = RepoAnalyzer::new(p.as_str().as_ref());
+		let ranalyzer_res = RepoAnalyzer::new(p.as_str().as_ref(), &repo_slug);
 		match ranalyzer_res {
 			Ok(ranalyzer) => {
 				valid_repo += 1;
@@ -115,9 +117,9 @@ fn process_aliases(alias_vec: Vec::<String>, einfo: &mut RuntimeInfo, writer: &m
 fn main() {
 	let args = Cli::parse();
 	let mut dockermode = false;
-	match args.argmode {
+	match args.provider {
 		Some(argval) => {
-			if argval == "docker" {
+			if argval == "github" || argval == "bitbucket" {
 				dockermode = true;
 			}
 		}
@@ -135,12 +137,12 @@ fn main() {
 					};
 					let rscanner = RepoScanner::new(scan_pathbuf);
 					let pathsvec = rscanner.scan(einfo, writer_mut, dockermode);
-					let alias_vec = process_repos(pathsvec, einfo, writer_mut);
+					let alias_vec = process_repos(pathsvec, einfo, writer_mut, args.repo_slug);
 					process_aliases(alias_vec, einfo, writer_mut, dockermode);
 					let _res = einfo.write_runtime_info(writer_mut);
 					match writer.finish() {
 						Ok(_) => {
-							println!("Profile generated as devprofile.jsonl.gz, proceed to https://devprofiler.tech/upload to upload!");
+							println!("Extracted and uploaded metadata successfully! Proceed to https://vibinex.com/ to learn more");
 						},
 						Err(error) => {
 							eprintln!("Unable to write to output : {error}");
@@ -157,12 +159,12 @@ fn main() {
 							let pathsvec = rscanner.scan(einfo, writer_mut, dockermode);
 							match UserInput::repo_selection(pathsvec) {
 								Ok(user_paths) => {
-									let alias_vec = process_repos(user_paths, einfo, writer_mut);
+									let alias_vec = process_repos(user_paths, einfo, writer_mut, None);
 									process_aliases(alias_vec, einfo, writer_mut, dockermode);
 									let _res = einfo.write_runtime_info(writer_mut);
 									match writer.finish() {
 										Ok(_) => {
-											println!("Profile generated as devprofile.jsonl.gz, proceed to https://devprofiler.tech/upload to upload!");
+											println!("Extracted and uploaded metadata successfully! Proceed to https://vibinex.com/ to learn more");
 										},
 										Err(error) => {
 											eprintln!("Unable to write to output : {error}");
