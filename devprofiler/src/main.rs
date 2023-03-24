@@ -32,7 +32,7 @@ struct UserAlias {
 	alias: Vec::<String>
 }
 
-fn process_repos(user_paths: Vec::<String>, einfo: &mut RuntimeInfo, writer: &mut OutputWriter, repo_slug: Option<String>) -> Vec::<String> {
+fn process_repos(user_paths: Vec::<String>, einfo: &mut RuntimeInfo, writer: &mut OutputWriter, repo_slug: Option<String>, provider: Option<String>) -> Vec::<String> {
 	let mut valid_repo = 0;
 	let mut all_aliases = HashSet::<String>::new();
 	let num_user_path = user_paths.len();
@@ -42,7 +42,7 @@ fn process_repos(user_paths: Vec::<String>, einfo: &mut RuntimeInfo, writer: &mu
 		count += 1;
 		print!("Scanning [{count}/{num_user_path}] \r");
 		let _res = io::stdout().flush();
-		let ranalyzer_res = RepoAnalyzer::new(p.as_str().as_ref(), &repo_slug);
+		let ranalyzer_res = RepoAnalyzer::new(p.as_str().as_ref(), &repo_slug, &provider);
 		match ranalyzer_res {
 			Ok(ranalyzer) => {
 				valid_repo += 1;
@@ -118,7 +118,7 @@ fn main() {
 	let args = Cli::parse();
 	let mut dockermode = false;
 	match args.provider {
-		Some(argval) => {
+		Some(ref argval) => {
 			if argval == "github" || argval == "bitbucket" {
 				dockermode = true;
 			}
@@ -137,7 +137,7 @@ fn main() {
 					};
 					let rscanner = RepoScanner::new(scan_pathbuf);
 					let pathsvec = rscanner.scan(einfo, writer_mut, dockermode);
-					let alias_vec = process_repos(pathsvec, einfo, writer_mut, args.repo_slug);
+					let alias_vec = process_repos(pathsvec, einfo, writer_mut, args.repo_slug, args.provider);
 					process_aliases(alias_vec, einfo, writer_mut, dockermode);
 					let _res = einfo.write_runtime_info(writer_mut);
 					match writer.finish() {
@@ -159,7 +159,7 @@ fn main() {
 							let pathsvec = rscanner.scan(einfo, writer_mut, dockermode);
 							match UserInput::repo_selection(pathsvec) {
 								Ok(user_paths) => {
-									let alias_vec = process_repos(user_paths, einfo, writer_mut, None);
+									let alias_vec = process_repos(user_paths, einfo, writer_mut, None, None);
 									process_aliases(alias_vec, einfo, writer_mut, dockermode);
 									let _res = einfo.write_runtime_info(writer_mut);
 									match writer.finish() {
