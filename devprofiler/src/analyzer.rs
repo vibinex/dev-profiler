@@ -11,16 +11,18 @@ use crate::observer::RuntimeInfo;
 
 pub struct RepoAnalyzer {
     repo: Repository,
-    path: PathBuf, 
+    path: PathBuf,
+    repo_slug: Option<String> 
 }
 
 impl RepoAnalyzer {
-    pub fn new(path_str: &str) -> Result<RepoAnalyzer, Box<dyn Error>> {
+    pub fn new(path_str: &str, repo_slug: &Option<String>) -> Result<RepoAnalyzer, Box<dyn Error>> {
         let path = Path::new(path_str);
         let repo = Repository::discover(&path)?;
         Ok(Self {
             path: path.to_owned(),
             repo: repo,
+            repo_slug: repo_slug.to_owned(),
         })
     }
 
@@ -67,8 +69,15 @@ impl RepoAnalyzer {
 
     fn extract_commit_obj(&self, commit: &Commit) -> CommitInfo {
         let diff = self.extract_diff(commit);
-        let cinfo = CommitInfo::new(commit, &diff, self.extract_reponame());
-        cinfo
+        let repo_name = match &self.repo_slug {
+            Some(repo_name_val) => {
+                &repo_name_val
+            }
+            None => {
+                self.extract_reponame()
+            }
+        };
+        CommitInfo::new(commit, &diff, repo_name)
     }
 
     fn extract_diff(&self, commit: &Commit) -> Option<Diff> {
