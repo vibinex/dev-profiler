@@ -6,7 +6,9 @@
 image: atlassian/default-image:4
 
 pipelines:
-  - step:
-      name: 'Run devprofiler'
+  branches:
+    '**':
+     - step:
+        name: 'Run devprofiler'
         script:
           - pipe: docker://tapish303/repo-profiler-pipe:latest 
