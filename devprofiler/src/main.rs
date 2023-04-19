@@ -141,7 +141,7 @@ fn generate_diff(prev_commit: &str, curr_commit: &str) {
 	println!("diff = {:?}", diffstr);
 }
 
-fn generate_blame(commit: &str, lines: &str, path: &str) {
+fn generate_blame(commit: &str, lines: &str, path: &str) -> HashMap<String, String>{
 	let resultblame = Command::new("git")
 		.args(&["blame", commit, "-L", lines, "-e", "--date=unix", path])
 		.output()
@@ -152,6 +152,9 @@ fn generate_blame(commit: &str, lines: &str, path: &str) {
 		Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
 	};
 	println!("blame = {:?}", blamestr);
+	let mut hunkmap = HashMap::new();
+	hunkmap.insert("hunkmap".to_owned(), "something array".to_owned());
+	return hunkmap;
 }
 
 fn get_tasks(provider: &str, repo_slug: &str) {
@@ -182,11 +185,25 @@ fn get_tasks(provider: &str, repo_slug: &str) {
 	// }
 }
 
+fn store_hunkmap(mut hunkmap: HashMap<String, String>) {
+	hunkmap.insert("provider".to_string(), "github".to_string());
+	hunkmap.insert("repo_owner".to_string(), "Alokit-Innovations".to_string());
+	hunkmap.insert("repo_name".to_string(), "dev-profiler".to_string());
+	let api_url = "http://127.0.0.1:8080/relevance/hunk/store";
+	let client = reqwest::blocking::Client::new();
+	let response = client.post(api_url)
+    	.json(&hunkmap)
+    	.send().expect("Get request failed")
+        .text();
+	println!("{:#?}", response);
+}
+
 fn unfinished_tasks(provider: &str, repo_slug: &str) {
 	get_tasks(provider, repo_slug);
 	generate_diff("a9e58c7", "8433a5e");
-	generate_blame("a9e58c7", "121,+5",
+	let hunkmap = generate_blame("a9e58c7", "121,+5",
 	"/home/tapishr/dev-profiler/devprofiler/src/main.rs");
+	store_hunkmap(hunkmap);
 }
 
 fn main() {
