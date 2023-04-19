@@ -10,12 +10,16 @@ mod scanner;
 use crate::scanner::RepoScanner;
 use std::process;
 use std::path::Path;
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 use std::collections::HashSet;
 use std::io::Write;
 use std::io;
 use clap::Parser;
 use std::path::PathBuf;
+use std::process::Command;
+use std::str;
+use std::collections::HashMap;
+
 
 #[derive(Parser)]
 struct Cli {
@@ -32,6 +36,17 @@ struct UserAlias {
 	alias: Vec::<String>
 }
 
+#[derive(Debug, Serialize, Default, Deserialize)]
+struct Reviews {
+    reviews: Vec<ReviewItem>,
+}
+
+#[derive(Debug, Serialize, Default, Deserialize)]
+struct ReviewItem {
+	prev_commit: String,
+	curr_commit: String,
+	id: String,
+}
 fn process_repos(user_paths: Vec::<String>, einfo: &mut RuntimeInfo, writer: &mut OutputWriter, repo_slug: Option<String>, provider: Option<String>) -> Vec::<String> {
 	let mut valid_repo = 0;
 	let mut all_aliases = HashSet::<String>::new();
@@ -101,7 +116,7 @@ fn process_aliases(alias_vec: Vec::<String>, einfo: &mut RuntimeInfo, writer: &m
 							process::exit(1);
 						}
 					}
-				 }
+				}
 				Err(error) => { 
 					eprintln!("Unable to process user aliases : {:?}", error);
 					einfo.record_err(error.to_string().as_str().as_ref());
@@ -110,8 +125,68 @@ fn process_aliases(alias_vec: Vec::<String>, einfo: &mut RuntimeInfo, writer: &m
 				}
 			}
 		}
+	}	
+}
+
+fn generate_diff(prev_commit: &str, curr_commit: &str) {
+	let result = Command::new("git")
+		.args(&["diff", prev_commit, curr_commit, "-U0"])
+        .output()
+        .expect("git diff command failed to start");
+	let diff = result.stdout;
+	let diffstr = match str::from_utf8(&diff) {
+		Ok(v) => v,
+		Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
+	};
+	println!("diff = {:?}", diffstr);
+}
+
+fn generate_blame(commit: &str, lines: &str, path: &str) {
+	let resultblame = Command::new("git")
+		.args(&["blame", commit, "-L", lines, "-e", "--date=unix", path])
+		.output()
+		.expect("git blame command failed to start");
+	let blame = resultblame.stdout;
+	let blamestr = match str::from_utf8(&blame) {
+		Ok(v) => v,
+		Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
+	};
+	println!("blame = {:?}", blamestr);
+}
+
+fn get_tasks(provider: &str, repo_slug: &str) {
+	let api_url = "http://127.0.0.1:8080/relevance/hunk";
+	let client = reqwest::blocking::Client::new();
+	let mut map = HashMap::new();
+	let repo_owner;
+	let repo_name;
+	if repo_slug.contains("/") {
+		let slug_parts: Vec<&str> = repo_slug.split("/").collect();
+		repo_owner = slug_parts[0];
+		repo_name = slug_parts[1];
 	}
-	
+	else {
+		repo_name = repo_slug;
+		repo_owner = "";
+	}
+	map.insert("provider", provider);
+	map.insert("repo_owner", repo_owner);
+	map.insert("repo_name", repo_name);
+	let response = client.post(api_url)
+    	.json(&map)
+    	.send().expect("Get request failed")
+        .json::<Reviews>().expect("Json parsing of response failed");
+    println!("{:#?}", response);
+	// for pr in response.entry('reviews') {
+
+	// }
+}
+
+fn unfinished_tasks(provider: &str, repo_slug: &str) {
+	get_tasks(provider, repo_slug);
+	generate_diff("a9e58c7", "8433a5e");
+	generate_blame("a9e58c7", "121,+5",
+	"/home/tapishr/dev-profiler/devprofiler/src/main.rs");
 }
 
 fn main() {
@@ -129,6 +204,7 @@ fn main() {
 		Ok(mut writer) => {
 			match dockermode {
 				true => {
+					unfinished_tasks(args.provider.as_ref().expect("Provider exists, checked"), args.repo_slug.as_ref().expect("No repo_slug"));
 					let writer_mut: &mut OutputWriter = &mut writer;
 					let einfo = &mut RuntimeInfo::new();
 					let scan_pathbuf = match args.path {
@@ -182,10 +258,11 @@ fn main() {
 					}
 				}
 			}
-			
 		},
 		Err(error) => {
 			eprintln!("Unable to start application : {error}");
 		}
 	}
 }
+// git diff a9e58c7 8433a5e -U0
+// git blame a9e58c7 -L 121,+5 -e --date=unix devprofiler/src/main.rs
