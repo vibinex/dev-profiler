@@ -64,11 +64,25 @@ struct BlameItem {
 }
 
 #[derive(Debug, Serialize, Default, Deserialize)]
+struct HunkPRMap {
+	repo_provider: String,
+	repo_owner: String,
+	repo_name: String,
+	prvec: Vec<BlameItem>,
+}
+
+#[derive(Debug, Serialize, Default, Deserialize)]
 struct HunkMap {
 	repo_provider: String,
 	repo_owner: String,
 	repo_name: String,
-	hunkvec: Vec<BlameItem>,
+	prhunkvec: Vec<PrHunkItem>,
+}
+
+#[derive(Debug, Serialize, Default, Deserialize)]
+struct PrHunkItem {
+	pr_number: String,
+	blamevec: Vec<BlameItem>,
 }
 
 fn process_repos(user_paths: Vec::<String>, einfo: &mut RuntimeInfo, writer: &mut OutputWriter, repo_slug: Option<String>, provider: Option<String>) -> Vec::<String> {
@@ -239,10 +253,7 @@ fn generate_blame(commit: &str, linemap: &HashMap<String, Vec<String>>) ->  Vec<
 	return blamevec;
 }
 
-fn get_tasks(provider: &str, repo_slug: &str) {
-	let api_url = "http://127.0.0.1:8080/relevance/hunk";
-	let client = reqwest::blocking::Client::new();
-	let mut map = HashMap::new();
+fn process_reposlug(repo_slug: &str) -> (String, String) {
 	let repo_owner;
 	let repo_name;
 	if repo_slug.contains("/") {
@@ -254,17 +265,22 @@ fn get_tasks(provider: &str, repo_slug: &str) {
 		repo_name = repo_slug;
 		repo_owner = "";
 	}
+	return (repo_name.to_string(), repo_owner.to_string());
+}
+
+fn get_tasks(provider: &str, repo_slug: &str) -> Reviews{
+	let api_url = "http://127.0.0.1:8080/relevance/hunk";
+	let client = reqwest::blocking::Client::new();
+	let mut map = HashMap::new();
+	let (repo_name, repo_owner) = process_reposlug(repo_slug);
 	map.insert("repo_provider", provider);
-	map.insert("repo_owner", repo_owner);
-	map.insert("repo_name", repo_name);
+	map.insert("repo_owner", repo_owner.as_str());
+	map.insert("repo_name", repo_name.as_str());
 	let response = client.post(api_url)
     	.json(&map)
     	.send().expect("Get request failed")
         .json::<Reviews>().expect("Json parsing of response failed");
-    println!("{:#?}", response);
-	// for pr in response.entry('reviews') {
-
-	// }
+	return response;
 }
 
 fn store_hunkmap(hunkmap: HunkMap) {
@@ -370,34 +386,23 @@ fn process_diff(diffmap: &HashMap<String, String>) -> HashMap<String, Vec<String
 	return linemap;
 }
 
-fn process_blame(blamevec: Vec<BlameItem>, provider: &str, repo_slug: &str) -> HunkMap {
-	let repo_owner;
-	let repo_name;
-	if repo_slug.contains("/") {
-		let slug_parts: Vec<&str> = repo_slug.split("/").collect();
-		repo_owner = slug_parts[0];
-		repo_name = slug_parts[1];
-	}
-	else {
-		repo_name = repo_slug;
-		repo_owner = "";
-	}
-	let hunkmap = HunkMap {
-		repo_name: repo_name.to_string(),
-		repo_owner: repo_owner.to_string(),
-		repo_provider: provider.to_string(),
-		hunkvec: blamevec,
-	};
-	return hunkmap;
-}
-
 fn unfinished_tasks(provider: &str, repo_slug: &str) {
-	get_tasks(provider, repo_slug);
-	let (bigfiles, smallfiles) = get_excluded_files("a9e58c7", "8433a5e");
-	let diffmap = generate_diff("a9e58c7", "8433a5e", &smallfiles);
-	let linemap = process_diff(&diffmap);
-	let blamevec = generate_blame("a9e58c7", &linemap);
-	let hunkmap = process_blame(blamevec, provider, repo_slug);
+	let reviews = get_tasks(provider, repo_slug);
+	let mut prvec = Vec::<PrHunkItem>::new();
+	for review in reviews.reviews {
+		let (bigfiles, smallfiles) = get_excluded_files(&review.prev_commit, &review.curr_commit);
+		let diffmap = generate_diff(&review.prev_commit, &review.curr_commit, &smallfiles);
+		let linemap = process_diff(&diffmap);
+		let blamevec = generate_blame(&review.prev_commit, &linemap);
+		let hmapitem = PrHunkItem {
+			pr_number: review.id,
+			blamevec: blamevec,
+		};
+		prvec.push(hmapitem);
+	}
+	let (repo_name, repo_owner) = process_reposlug(repo_slug);
+	let hunkmap = HunkMap { repo_provider: provider.to_string(),
+		repo_owner: repo_owner, repo_name: repo_name, prhunkvec: prvec };
 	store_hunkmap(hunkmap);
 }
 
