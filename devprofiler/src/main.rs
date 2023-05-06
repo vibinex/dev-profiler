@@ -8,14 +8,17 @@ mod observer;
 use crate::observer::RuntimeInfo;
 mod scanner;
 use crate::scanner::RepoScanner;
+mod reviewer;
+use crate::reviewer::unfinished_tasks;
 use std::process;
 use std::path::Path;
-use serde::Serialize;
+use serde::{Serialize};
 use std::collections::HashSet;
 use std::io::Write;
 use std::io;
 use clap::Parser;
 use std::path::PathBuf;
+
 
 #[derive(Parser)]
 struct Cli {
@@ -101,7 +104,7 @@ fn process_aliases(alias_vec: Vec::<String>, einfo: &mut RuntimeInfo, writer: &m
 							process::exit(1);
 						}
 					}
-				 }
+				}
 				Err(error) => { 
 					eprintln!("Unable to process user aliases : {:?}", error);
 					einfo.record_err(error.to_string().as_str().as_ref());
@@ -110,8 +113,7 @@ fn process_aliases(alias_vec: Vec::<String>, einfo: &mut RuntimeInfo, writer: &m
 				}
 			}
 		}
-	}
-	
+	}	
 }
 
 fn main() {
@@ -129,6 +131,8 @@ fn main() {
 		Ok(mut writer) => {
 			match dockermode {
 				true => {
+					let einfo = &mut RuntimeInfo::new();
+					unfinished_tasks(args.provider.as_ref().expect("Provider exists, checked"), args.repo_slug.as_ref().expect("No repo_slug"), einfo);
 					let writer_mut: &mut OutputWriter = &mut writer;
 					let einfo = &mut RuntimeInfo::new();
 					let scan_pathbuf = match args.path {
@@ -182,10 +186,13 @@ fn main() {
 					}
 				}
 			}
-			
 		},
 		Err(error) => {
 			eprintln!("Unable to start application : {error}");
 		}
 	}
 }
+// git diff a9e58c7 8433a5e -U0
+// git blame a9e58c7 -L 121,+5 -e --date=unix devprofiler/src/main.rs
+// git diff a9e58c7:devprofiler/src/analyzer.rs 8433a5e:devprofiler/src/analyzer.rs'
+// git diff a9e58c7 8433a5e --stat
