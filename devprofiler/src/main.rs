@@ -8,19 +8,16 @@ mod observer;
 use crate::observer::RuntimeInfo;
 mod scanner;
 use crate::scanner::RepoScanner;
-use std::hash::Hash;
+mod reviewer;
+use crate::reviewer::unfinished_tasks;
 use std::process;
 use std::path::Path;
-use serde::{Serialize, Deserialize};
+use serde::{Serialize};
 use std::collections::HashSet;
 use std::io::Write;
 use std::io;
 use clap::Parser;
 use std::path::PathBuf;
-use std::process::Command;
-use std::str;
-use std::collections::HashMap;
-use sha256::digest;
 
 
 #[derive(Parser)]
@@ -36,53 +33,6 @@ struct Cli {
 #[derive(Debug, Serialize, Default)]
 struct UserAlias {
 	alias: Vec::<String>
-}
-
-#[derive(Debug, Serialize, Default, Deserialize)]
-struct Reviews {
-    reviews: Vec<ReviewItem>,
-}
-
-#[derive(Debug, Serialize, Default, Deserialize)]
-struct ReviewItem {
-	prev_commit: String,
-	curr_commit: String,
-	id: String,
-}
-
-#[derive(Debug, Serialize, Default, Deserialize)]
-struct StatItem {
-	filepath: String,
-	additions: i32,
-	deletions: i32,
-}
-#[derive(Debug, Serialize, Default, Deserialize)]
-struct BlameItem {
-	hunkhash: String,
-	author: String,
-	timestamp: String,
-}
-
-#[derive(Debug, Serialize, Default, Deserialize)]
-struct HunkPRMap {
-	repo_provider: String,
-	repo_owner: String,
-	repo_name: String,
-	prvec: Vec<BlameItem>,
-}
-
-#[derive(Debug, Serialize, Default, Deserialize)]
-struct HunkMap {
-	repo_provider: String,
-	repo_owner: String,
-	repo_name: String,
-	prhunkvec: Vec<PrHunkItem>,
-}
-
-#[derive(Debug, Serialize, Default, Deserialize)]
-struct PrHunkItem {
-	pr_number: String,
-	blamevec: Vec<BlameItem>,
 }
 
 fn process_repos(user_paths: Vec::<String>, einfo: &mut RuntimeInfo, writer: &mut OutputWriter, repo_slug: Option<String>, provider: Option<String>) -> Vec::<String> {
@@ -166,246 +116,6 @@ fn process_aliases(alias_vec: Vec::<String>, einfo: &mut RuntimeInfo, writer: &m
 	}	
 }
 
-fn generate_diff(prev_commit: &str, curr_commit: &str, smallfiles: &Vec<StatItem>) -> HashMap<String, String> {
-	// println!("smallfiles = {:#?}", smallfiles);
-	let mut diffmap = HashMap::<String, String>::new();
-	for item in smallfiles {
-		let filepath = item.filepath.as_str();
-		let params = vec![
-		"diff".to_string(),
-		format!("{prev_commit}:{filepath}"),
-		format!("{curr_commit}:{filepath}"),
-		"-U0".to_string()];
-		println!("params = {:#?}", params);
-		let result = Command::new("git")
-		.args(&params)
-        .output()
-        .expect("git diff command failed to start");
-		let diff = result.stdout;
-		let diffstr = match str::from_utf8(&diff) {
-			Ok(v) => v,
-			Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
-		};
-		println!("diff for item {filepath} = {:?}", diffstr);
-		diffmap.insert(filepath.to_string(), diffstr.to_string());
-	}
-	println!("diffmap = {:#?}", diffmap);
-	return diffmap;
-}
-
-fn generate_blame(commit: &str, linemap: &HashMap<String, Vec<String>>) ->  Vec<BlameItem>{
-	let mut blamevec = Vec::<BlameItem>::new();
-	for (path, linevec) in linemap {
-		for line in linevec {
-			let paramvec: Vec<&str> = vec!(
-				"blame",
-				commit,
-				"-L",
-				line.as_str(),
-				"-e",
-				"--date=unix",
-				path.as_str());
-			let resultblame = Command::new("git")
-				.args(paramvec)
-				.output()
-				.expect("git blame command failed to start");
-			let blame = resultblame.stdout;
-			let blamestr = match str::from_utf8(&blame) {
-				Ok(v) => v,
-				Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
-			};
-			let blamelines: Vec<&str> = blamestr.lines().collect();
-			let wordvec: Vec<&str> = blamelines[0].split(" ").collect();
-			let mut author = wordvec[1];
-			let mut timestamp = wordvec[2];
-			let mut idx = 1;
-			if author == "" {
-				while idx < wordvec.len() && wordvec[idx] == "" {
-					idx = idx + 1;
-				}
-				if idx < wordvec.len() {
-					author = wordvec[idx];
-				}
-			}
-			let authorstr = author.replace("(", "")
-				.replace("<", "")
-				.replace(">", "");
-			if timestamp == "" {
-				idx = idx + 1;
-				while idx < wordvec.len() && wordvec[idx] == "" {
-					idx = idx + 1;
-				}
-				if idx < wordvec.len() {
-					timestamp = wordvec[idx];
-				}
-			}
-			let hunkstr = wordvec[idx+3..].to_vec().join(" ");
-			let hunkhash = digest(hunkstr);
-			blamevec.push(
-				BlameItem { 
-					hunkhash: hunkhash,
-					author: authorstr.to_string(),
-					timestamp: timestamp.to_string(), 
-				}
-			);
-		}
-	}
-	return blamevec;
-}
-
-fn process_reposlug(repo_slug: &str) -> (String, String) {
-	let repo_owner;
-	let repo_name;
-	if repo_slug.contains("/") {
-		let slug_parts: Vec<&str> = repo_slug.split("/").collect();
-		repo_owner = slug_parts[0];
-		repo_name = slug_parts[1];
-	}
-	else {
-		repo_name = repo_slug;
-		repo_owner = "";
-	}
-	return (repo_name.to_string(), repo_owner.to_string());
-}
-
-fn get_tasks(provider: &str, repo_slug: &str) -> Reviews{
-	let api_url = "http://127.0.0.1:8080/relevance/hunk";
-	let client = reqwest::blocking::Client::new();
-	let mut map = HashMap::new();
-	let (repo_name, repo_owner) = process_reposlug(repo_slug);
-	map.insert("repo_provider", provider);
-	map.insert("repo_owner", repo_owner.as_str());
-	map.insert("repo_name", repo_name.as_str());
-	let response = client.post(api_url)
-    	.json(&map)
-    	.send().expect("Get request failed")
-        .json::<Reviews>().expect("Json parsing of response failed");
-	return response;
-}
-
-fn store_hunkmap(hunkmap: HunkMap) {
-	let api_url = "http://127.0.0.1:8080/relevance/hunk/store";
-	let client = reqwest::blocking::Client::new();
-	let response = client.post(api_url)
-    	.json(&hunkmap)
-    	.send().expect("Get /relevance/hunk/store request failed")
-        .text();
-	println!("{:#?}", response);
-}
-
-fn get_excluded_files(prev_commit: &str, next_commit: &str) -> (Vec<StatItem>, Vec<StatItem>) {
-	// Use the command
-	let resultstat = Command::new("git")
-		.args(&["diff", prev_commit, next_commit, "--numstat"])
-		.output()
-		.expect("git diff stat command failed to start");
-	let stat = resultstat.stdout;
-	// parse the output
-	let statstr = match str::from_utf8(&stat) {
-		Ok(v) => v,
-		Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
-	};
-	let statlines = statstr.split("\n");
-	let mut statvec = Vec::<StatItem>::new();
-	for line in statlines {
-		let statitems: Vec<&str> = line.split("\t").collect();
-		if statitems.len() >= 3 {
-			let statitem = StatItem {
-				filepath: statitems[2].to_string(),
-				additions: statitems[0].to_string().parse().expect("Failed to parse git diff stat additions"),
-				deletions: statitems[1].to_string().parse().expect("Failed to parse git diff stat deletions"),
-			};
-			statvec.push(statitem);
-		}
-	}
-	// logic for exclusion
-	let mut bigfiles = Vec::<StatItem>::new();
-	let mut smallfiles = Vec::<StatItem>::new();
-	let line_threshold = 50;
-	for item in statvec {
-		if (item.additions > line_threshold) || 
-		(item.deletions > line_threshold) || 
-		(item.additions + item.deletions > line_threshold) {
-			bigfiles.push(item);
-		}
-		else {
-			smallfiles.push(item);
-		}
-	}
-	// compile the result and return
-	return (bigfiles, smallfiles);
-}
-
-fn process_diff(diffmap: &HashMap<String, String>) -> HashMap<String, Vec<String>> {
-	let mut linemap: HashMap<String, Vec<String>> = HashMap::new();
-	for (filepath, diff) in diffmap {
-		let mut limiterpos = Vec::new();
-		let delimitter = "@@";
-		for (idx, _) in diff.match_indices(delimitter) {
-			limiterpos.push(idx);
-		}
-		let mut idx: usize = 0;
-		let len = limiterpos.len();
-		while (idx + 1) < len {
-			let line = diff.get(
-				(limiterpos[idx]+delimitter.len())..limiterpos[idx+1]
-			).expect("Unable to format diff line");
-			let sublines: Vec<&str> = line.split(" ").collect();
-			if line.contains("\n") || sublines.len() != 4 {
-				idx += 1;
-				continue;
-			}
-			let mut deletionstr = sublines[1].to_owned();
-			// let additionstr = sublines[1];
-			if deletionstr.contains("-") {
-				deletionstr = deletionstr.replace("-", "");
-				if deletionstr.contains(",") {
-					let delsplit: Vec<&str> = deletionstr.split(",").collect();
-					let delidx = delsplit[0].parse::<i32>().unwrap();
-					let deldiff = delsplit[1].parse::<i32>().unwrap();
-					deletionstr = format!("{delidx},{}", delidx+deldiff);
-				}
-				else {
-					let delidx = deletionstr.parse::<i32>().unwrap();
-					deletionstr.push_str(format!(",{}", delidx+1).as_str());
-				}
-			}
-			else {
-				idx += 1;
-				continue;
-			}
-			if linemap.contains_key(filepath) {
-				linemap.get_mut(filepath).unwrap().push(deletionstr);
-			}
-			else {
-				linemap.insert(filepath.to_string(), vec!(deletionstr));
-			}
-			idx += 1;
-		}
-	}
-	return linemap;
-}
-
-fn unfinished_tasks(provider: &str, repo_slug: &str) {
-	let reviews = get_tasks(provider, repo_slug);
-	let mut prvec = Vec::<PrHunkItem>::new();
-	for review in reviews.reviews {
-		let (bigfiles, smallfiles) = get_excluded_files(&review.prev_commit, &review.curr_commit);
-		let diffmap = generate_diff(&review.prev_commit, &review.curr_commit, &smallfiles);
-		let linemap = process_diff(&diffmap);
-		let blamevec = generate_blame(&review.prev_commit, &linemap);
-		let hmapitem = PrHunkItem {
-			pr_number: review.id,
-			blamevec: blamevec,
-		};
-		prvec.push(hmapitem);
-	}
-	let (repo_name, repo_owner) = process_reposlug(repo_slug);
-	let hunkmap = HunkMap { repo_provider: provider.to_string(),
-		repo_owner: repo_owner, repo_name: repo_name, prhunkvec: prvec };
-	store_hunkmap(hunkmap);
-}
-
 fn main() {
 	let args = Cli::parse();
 	let mut dockermode = false;
@@ -421,7 +131,8 @@ fn main() {
 		Ok(mut writer) => {
 			match dockermode {
 				true => {
-					unfinished_tasks(args.provider.as_ref().expect("Provider exists, checked"), args.repo_slug.as_ref().expect("No repo_slug"));
+					let einfo = &mut RuntimeInfo::new();
+					unfinished_tasks(args.provider.as_ref().expect("Provider exists, checked"), args.repo_slug.as_ref().expect("No repo_slug"), einfo);
 					let writer_mut: &mut OutputWriter = &mut writer;
 					let einfo = &mut RuntimeInfo::new();
 					let scan_pathbuf = match args.path {
