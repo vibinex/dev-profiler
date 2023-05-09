@@ -102,7 +102,10 @@ fn generate_blame(commit: &str, linemap: &HashMap<String, Vec<String>>, einfo: &
 					match str::from_utf8(&blame) {
 						Ok(blamestr) => {
 							let blamelines: Vec<&str> = blamestr.lines().collect();
+							let mut prev_author = "".to_string();
+							let mut lnum = -1;
 							for ln in blamelines {
+								lnum = lnum + 1;
 								let wordvec: Vec<&str> = ln.split(" ").collect();
 								let mut author = wordvec[1];
 								let mut timestamp = wordvec[2];
@@ -118,26 +121,32 @@ fn generate_blame(commit: &str, linemap: &HashMap<String, Vec<String>>, einfo: &
 								let authorstr = author.replace("(", "")
 									.replace("<", "")
 									.replace(">", "");
-								if timestamp == "" {
-									idx = idx + 1;
-									while idx < wordvec.len() && wordvec[idx] == "" {
-										idx = idx + 1;
-									}
-									if idx < wordvec.len() {
-										timestamp = wordvec[idx];
-									}
+								if authorstr == prev_author {
+									continue;
 								}
-								let hunkstr = wordvec[idx+3..].to_vec().join(" ");
-								let hunkhash = digest(hunkstr);
-								blamevec.push(
-									BlameItem { 
-										hunkhash: hunkhash,
-										author: authorstr.to_string(),
-										timestamp: timestamp.to_string(),
-										linenum: linenum.to_string(),
-										filepath: digest(path.as_str()),
+								else {
+									prev_author = authorstr.clone();
+									if timestamp == "" {
+										idx = idx + 1;
+										while idx < wordvec.len() && wordvec[idx] == "" {
+											idx = idx + 1;
+										}
+										if idx < wordvec.len() {
+											timestamp = wordvec[idx];
+										}
 									}
-								);
+									let hunkstr = wordvec[idx+3..].to_vec().join(" ");
+									let hunkhash = digest(hunkstr);
+									blamevec.push(
+										BlameItem { 
+											hunkhash: hunkhash,
+											author: authorstr,
+											timestamp: timestamp.to_string(),
+											linenum: (linenum.parse::<i32>().expect("Unable to parse linenum") + lnum).to_string(),
+											filepath: digest(path.as_str()),
+										}
+									);	
+								}
 							}
 						},
 						Err(e) => {einfo.record_err(e.to_string().as_str());},
@@ -241,7 +250,7 @@ fn get_excluded_files(prev_commit: &str, next_commit: &str, einfo: &mut RuntimeI
 						// logic for exclusion
 						let mut bigfiles = Vec::<StatItem>::new();
 						let mut smallfiles = Vec::<StatItem>::new();
-						let line_threshold = 50;
+						let line_threshold = 500;
 						for item in statvec {
 							if (item.additions > line_threshold) || 
 							(item.deletions > line_threshold) || 

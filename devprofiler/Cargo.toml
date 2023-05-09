@@ -1,8 +1,8 @@
 [package]
 name = "devprofiler"
-version = "0.1.1"
+version = "0.2.1"
 edition = "2021"
-authors = ["Tapish Rathore <tapish303@gmail.com>"]
+authors = ["Tapish Rathore <tapish@vibinex.com>"]
 license = "GPL-3.0-or-later"
 description = "CLI tool for analysing code contribution to a repository"
 readme = "README.md"
