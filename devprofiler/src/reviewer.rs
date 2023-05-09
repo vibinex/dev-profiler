@@ -145,7 +145,7 @@ fn generate_blame(commit: &str, linemap: &HashMap<String, Vec<String>>, einfo: &
 											linenum: (linenum.parse::<i32>().expect("Unable to parse linenum") + lnum).to_string(),
 											filepath: digest(path.as_str()),
 										}
-									);
+									);	
 								}
 							}
 						},
