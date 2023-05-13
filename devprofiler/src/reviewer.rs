@@ -26,11 +26,17 @@ struct StatItem {
 }
 #[derive(Debug, Serialize, Default, Deserialize)]
 struct BlameItem {
-	hunkhash: String,
 	author: String,
 	timestamp: String,
-	linenum: String,
+	line_start: String,
+	line_end: String,
 	filepath: String,
+}
+
+#[derive(Debug, Serialize, Default, Deserialize)]
+struct LineItem {
+	author: String,
+	timestamp: String,
 }
 
 #[derive(Debug, Serialize, Default, Deserialize)]
@@ -82,6 +88,42 @@ fn generate_diff(prev_commit: &str, curr_commit: &str, smallfiles: &Vec<StatItem
 	return diffmap;
 }
 
+fn process_blamelines(blamelines: &Vec<&str>, linenum: usize) -> HashMap<usize, LineItem> {
+	let mut linemap = HashMap::<usize, LineItem>::new();
+	for lnum  in 0..blamelines.len() {
+		let ln = blamelines[lnum];
+		let wordvec: Vec<&str> = ln.split(" ").collect();
+		let mut author = wordvec[1];
+		let mut timestamp = wordvec[2];
+		let mut idx = 1;
+		if author == "" {
+			while idx < wordvec.len() && wordvec[idx] == "" {
+				idx = idx + 1;
+			}
+			if idx < wordvec.len() {
+				author = wordvec[idx];
+			}
+		}
+		let authorstr = author.replace("(", "")
+			.replace("<", "")
+			.replace(">", "");
+		if timestamp == "" {
+			idx = idx + 1;
+			while idx < wordvec.len() && wordvec[idx] == "" {
+				idx = idx + 1;
+			}
+			if idx < wordvec.len() {
+				timestamp = wordvec[idx];
+			}
+		}
+		linemap.insert(
+			linenum + lnum,
+			LineItem { author: authorstr.to_string(), timestamp: timestamp.to_string() }
+		);
+	}
+	return linemap;
+}
+
 fn generate_blame(commit: &str, linemap: &HashMap<String, Vec<String>>, einfo: &mut RuntimeInfo) ->  Vec<BlameItem>{
 	let mut blamevec = Vec::<BlameItem>::new();
 	for (path, linevec) in linemap {
@@ -102,52 +144,39 @@ fn generate_blame(commit: &str, linemap: &HashMap<String, Vec<String>>, einfo: &
 					match str::from_utf8(&blame) {
 						Ok(blamestr) => {
 							let blamelines: Vec<&str> = blamestr.lines().collect();
-							let mut prev_author = "".to_string();
-							let mut lnum = -1;
-							for ln in blamelines {
-								lnum = lnum + 1;
-								let wordvec: Vec<&str> = ln.split(" ").collect();
-								let mut author = wordvec[1];
-								let mut timestamp = wordvec[2];
-								let mut idx = 1;
-								if author == "" {
-									while idx < wordvec.len() && wordvec[idx] == "" {
-										idx = idx + 1;
+							let linenumint = linenum.parse::<usize>().expect("Unable to parse linenum");
+							let lineauthormap = process_blamelines(&blamelines, linenumint);
+							let mut linebreak = linenumint;
+							for lidx in linenumint..(linenumint + blamelines.len()-1) {
+								if lineauthormap.contains_key(&lidx) && lineauthormap.contains_key(&(lidx+1)) {
+									let lineitem = lineauthormap.get(&lidx).expect("lidx checked");
+									if lineitem.author == 
+									lineauthormap.get(&(lidx+1)).expect("lidx+1 checked").author {
+										continue;
 									}
-									if idx < wordvec.len() {
-										author = wordvec[idx];
+									else {
+										blamevec.push(BlameItem {
+											author: lineitem.author.to_string(),
+											timestamp: lineitem.timestamp.to_string(),
+											line_start: linebreak.to_string(),
+											line_end: lidx.to_string(),
+											filepath: digest(path.as_str()) });
+										linebreak = lidx + 1;
 									}
-								}
-								let authorstr = author.replace("(", "")
-									.replace("<", "")
-									.replace(">", "");
-								if authorstr == prev_author {
-									continue;
-								}
-								else {
-									prev_author = authorstr.clone();
-									if timestamp == "" {
-										idx = idx + 1;
-										while idx < wordvec.len() && wordvec[idx] == "" {
-											idx = idx + 1;
-										}
-										if idx < wordvec.len() {
-											timestamp = wordvec[idx];
-										}
-									}
-									let hunkstr = wordvec[idx+3..].to_vec().join(" ");
-									let hunkhash = digest(hunkstr);
-									blamevec.push(
-										BlameItem { 
-											hunkhash: hunkhash,
-											author: authorstr,
-											timestamp: timestamp.to_string(),
-											linenum: (linenum.parse::<i32>().expect("Unable to parse linenum") + lnum).to_string(),
-											filepath: digest(path.as_str()),
-										}
-									);	
 								}
 							}
+							let lastidx = linenumint + blamelines.len()-1;
+							if lineauthormap.contains_key(&lastidx) {
+								let lineitem = lineauthormap.get(&lastidx).expect("lastidx checked");
+								blamevec.push(BlameItem {
+									author: lineitem.author.to_string(),
+									timestamp: lineitem.timestamp.to_string(),
+									line_start: linebreak.to_string(),
+									line_end: lastidx.to_string(),
+									filepath: digest(path.as_str()) });
+
+							}
+							
 						},
 						Err(e) => {einfo.record_err(e.to_string().as_str());},
 					};
