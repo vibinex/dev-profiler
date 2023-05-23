@@ -270,8 +270,14 @@ fn get_excluded_files(prev_commit: &str, next_commit: &str, einfo: &mut RuntimeI
 							if statitems.len() >= 3 {
 								let statitem = StatItem {
 									filepath: statitems[2].to_string(),
-									additions: statitems[0].to_string().parse().expect("Failed to parse git diff stat additions"),
-									deletions: statitems[1].to_string().parse().expect("Failed to parse git diff stat deletions"),
+									additions: match statitems[0].to_string().parse() {
+										Ok(adds) => {adds}
+										Err(e) => {0}
+									},
+									deletions: match statitems[0].to_string().parse() {
+										Ok(dels) => {dels}
+										Err(e) => {0}
+									},
 								};
 								statvec.push(statitem);
 							}
