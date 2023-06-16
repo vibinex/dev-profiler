@@ -1,3 +1,4 @@
+
 import re
 import fileinput
 
@@ -19,3 +20,4 @@ new_version = f"{version_parts[0]}.{version_parts[1]}.{new_patch}"
 for line in fileinput.input("devprofiler/Cargo.toml", inplace=True):
     line = re.sub(r'^version\s*=\s*".*?"', f'version = "{new_version}"', line.rstrip())
     print(line)
+

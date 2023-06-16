@@ -1,3 +1,4 @@
+
 name: Auto-version
 
 on:
@@ -75,3 +76,4 @@ jobs:
           asset_path: ./devprofiler/target/debian/devprofiler.deb
           asset_name: devprofiler.deb
           asset_content_type: application/octet-stream
+
