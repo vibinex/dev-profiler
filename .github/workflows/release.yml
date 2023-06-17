@@ -41,7 +41,8 @@ jobs:
         id: get_version
         run: |
           cd devprofiler
-          echo "::set-output name=version::$(grep -Po '(?<=version = ")[\d.]+(?=")' Cargo.toml)"
+          echo "{version}={$(grep -Po '(?<=version = ")[\d.]+(?=")' Cargo.toml)}" >> $GITHUB_OUTPUT
+#          echo "::set-output name=version::$(grep -Po '(?<=version = ")[\d.]+(?=")' Cargo.toml)"
           
       - name: Create Release
         id: create_release
