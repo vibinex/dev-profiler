@@ -14,9 +14,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
-      - name: Install dependencies
-        run: pip install semver
-
       - name: Run Build Script
         run: |
            git config user.name "GitHub Actions Bot"
