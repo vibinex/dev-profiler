@@ -144,6 +144,9 @@ fn generate_blame(commit: &str, linemap: &HashMap<String, Vec<String>>, einfo: &
 					match str::from_utf8(&blame) {
 						Ok(blamestr) => {
 							let blamelines: Vec<&str> = blamestr.lines().collect();
+							if blamelines.len() == 0 {
+								continue;
+							}
 							let linenumint = linenum.parse::<usize>().expect("Unable to parse linenum");
 							let lineauthormap = process_blamelines(&blamelines, linenumint);
 							let mut linebreak = linenumint;
@@ -366,6 +369,7 @@ pub(crate) fn unfinished_tasks(provider: &str, repo_slug: &str, einfo: &mut Runt
 	if reviews.is_some() {
 		let mut prvec = Vec::<PrHunkItem>::new();
 		for review in reviews.expect("Validated reviews").reviews {
+			println!("Processing PR : {}", review.id);
 			let fileopt = get_excluded_files(&review.base_head_commit, &review.pr_head_commit, einfo);
 			if fileopt.is_some() {
 				let (bigfiles, smallfiles) = fileopt.expect("Validated fileopt");
