@@ -51,7 +51,7 @@ async fn request_git_urls(repo_owner: &str, keypath: &str) {
 
 async fn clone_git_repo(git_urls: HashMap<String, String>) {
     for (repo_name, git_url) in git_urls {
-        let directory = format!("/app/{repo_name}");
+        let directory = "/app";
         let mut cmd = std::process::Command::new("git");
         cmd.arg("clone").arg(git_url).current_dir(directory);
         let output = cmd.output().expect("Failed to clone git repo");
@@ -82,9 +82,10 @@ async fn listen_messages(keypath: &str, topicname: &str, subscriptionname: &str,
                 match msgtype.as_str() {
                     "GitUrl" => {
                         // Convert the data from base64 to a string
-                        let payload = String::from_utf8(message.message.data.clone()).unwrap();
+                        let payload = String::from_utf8(message.message.data.clone()).expect("Failed to convert GitUrl msg to string");
 
                         // Deserialize the JSON payload into a struct
+                        println!("GitUrl message: {:?}", payload);
                         let result: JsonResult<GitUrl> = serde_json::from_str(&payload);
 
                         let giturls = result.expect("Failed to deserialize GitUrl message").git_urls;
@@ -104,6 +105,8 @@ async fn listen_messages(keypath: &str, topicname: &str, subscriptionname: &str,
                         match result {
                             Ok(prmsg) => {
                                 let repo_key = prmsg.repo_slug.clone();
+                                println!("repo_list: {:?}", repo_list);
+                                println!("repo_key: {:?}", repo_key);
                                 if repo_list.contains(&repo_key) {
                                     let hunks = unfinished_tasks(prmsg, repo_key.as_str(), einfo);
                                     let message = serde_json::to_string(&hunks).expect("Failed to serialize Hunks");
