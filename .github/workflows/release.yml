@@ -2,12 +2,13 @@
 name: Auto-version
 
 on:
-  push:
-    branches:
-      - main
+  pull_request:
+    types:
+      - closed
 
 jobs:
   build:
+    if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref != 'update-cargo-toml'
     runs-on: ubuntu-latest
 
     steps:
@@ -23,11 +24,15 @@ jobs:
         run: |
            python update.py
 
-      - name: commit updated Cargo.toml
-        run: |
-           git add devprofiler/Cargo.toml
-           git commit -m "Updated code"
-           git push origin main
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "Updated code"
+          title: "Update Cargo.toml"
+          body: "This pull request updates the Cargo.toml file."
+          branch: update-cargo-toml
+          reviewers: tapishr
 
       - name: Build Rust CLI
         run: |
