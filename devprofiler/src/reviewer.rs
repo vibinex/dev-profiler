@@ -7,8 +7,10 @@ use sha256::digest;
 use crate::observer::RuntimeInfo;
 
 #[derive(Debug, Serialize, Default, Deserialize)]
-struct Reviews {
+pub struct Reviews {
     reviews: Vec<ReviewItem>,
+	provider: String,
+	pub repo_slug: String,
 }
 
 #[derive(Debug, Serialize, Default, Deserialize)]
@@ -48,7 +50,7 @@ struct HunkPRMap {
 }
 
 #[derive(Debug, Serialize, Default, Deserialize)]
-struct HunkMap {
+pub struct HunkMap {
 	repo_provider: String,
 	repo_owner: String,
 	repo_name: String,
@@ -60,8 +62,9 @@ struct PrHunkItem {
 	pr_number: String,
 	blamevec: Vec<BlameItem>,
 }
-fn generate_diff(prev_commit: &str, curr_commit: &str, smallfiles: &Vec<StatItem>, einfo: &mut RuntimeInfo) -> HashMap<String, String> {
+fn generate_diff(prev_commit: &str, curr_commit: &str, smallfiles: &Vec<StatItem>, repo_dirname: &str, einfo: &mut RuntimeInfo) -> HashMap<String, String> {
 	let mut diffmap = HashMap::<String, String>::new();
+	let directory = format!("/app/{}", repo_dirname);
 	for item in smallfiles {
 		let filepath = item.filepath.as_str();
 		let params = vec![
@@ -69,7 +72,7 @@ fn generate_diff(prev_commit: &str, curr_commit: &str, smallfiles: &Vec<StatItem
 		format!("{prev_commit}:{filepath}"),
 		format!("{curr_commit}:{filepath}"),
 		"-U0".to_string()];
-		match Command::new("git").args(&params).output() {
+		match Command::new("git").args(&params).current_dir(directory.as_str()).output() {
 			Ok(result) => {
 				let diff = result.stdout;
 				match str::from_utf8(&diff) {
@@ -124,7 +127,8 @@ fn process_blamelines(blamelines: &Vec<&str>, linenum: usize) -> HashMap<usize, 
 	return linemap;
 }
 
-fn generate_blame(commit: &str, linemap: &HashMap<String, Vec<String>>, einfo: &mut RuntimeInfo) ->  Vec<BlameItem>{
+fn generate_blame(commit: &str, linemap: &HashMap<String, Vec<String>>, repo_dirname: &str, einfo: &mut RuntimeInfo) ->  Vec<BlameItem>{
+	let directory = format!("/app/{}", repo_dirname);
 	let mut blamevec = Vec::<BlameItem>::new();
 	for (path, linevec) in linemap {
 		for line in linevec {
@@ -138,7 +142,7 @@ fn generate_blame(commit: &str, linemap: &HashMap<String, Vec<String>>, einfo: &
 				path.as_str());
 			let linenumvec: Vec<&str> = line.split(",").collect();
 			let linenum = linenumvec[0];
-			match Command::new("git").args(paramvec).output() {
+			match Command::new("git").args(paramvec).current_dir(directory.as_str()).output() {
 				Ok(resultblame) => {
 					let blame = resultblame.stdout;
 					match str::from_utf8(&blame) {
@@ -191,7 +195,7 @@ fn generate_blame(commit: &str, linemap: &HashMap<String, Vec<String>>, einfo: &
 	return blamevec;
 }
 
-fn process_reposlug(repo_slug: &str) -> (String, String) {
+pub(crate) fn process_reposlug(repo_slug: &str) -> (String, String) {
 	let repo_owner;
 	let repo_name;
 	if repo_slug.contains("/") {
@@ -253,10 +257,12 @@ fn store_hunkmap(hunkmap: HunkMap, einfo: &mut RuntimeInfo) {
 	}
 }
 
-fn get_excluded_files(prev_commit: &str, next_commit: &str, einfo: &mut RuntimeInfo) -> Option<(Vec<StatItem>, Vec<StatItem>)> {
+fn get_excluded_files(prev_commit: &str, next_commit: &str, repo_dirname: &str, einfo: &mut RuntimeInfo) -> Option<(Vec<StatItem>, Vec<StatItem>)> {
 	// Use the command
+	let directory = format!("/app/{}", repo_dirname);
 	match Command::new("git")
 		.args(&["diff", prev_commit, next_commit, "--numstat"])
+		.current_dir(directory.as_str())
 		.output() {
 			Ok(resultstat) => {
 				let stat = resultstat.stdout;
@@ -361,35 +367,32 @@ fn process_diff(diffmap: &HashMap<String, String>) -> Result<HashMap<String, Vec
 	return Ok(linemap);
 }
 
-pub(crate) fn unfinished_tasks(provider: &str, repo_slug: &str, einfo: &mut RuntimeInfo) {
-	let reviews = get_tasks(provider, repo_slug, einfo);
-	if reviews.is_some() {
-		let mut prvec = Vec::<PrHunkItem>::new();
-		for review in reviews.expect("Validated reviews").reviews {
-			let fileopt = get_excluded_files(&review.base_head_commit, &review.pr_head_commit, einfo);
-			if fileopt.is_some() {
-				let (bigfiles, smallfiles) = fileopt.expect("Validated fileopt");
-				let diffmap = generate_diff(&review.base_head_commit, &review.pr_head_commit, &smallfiles, einfo);
-				let diffres = process_diff(&diffmap);
-				match diffres {
-					Ok(linemap) => {
-						let blamevec = generate_blame(&review.base_head_commit, &linemap, einfo);
-						let hmapitem = PrHunkItem {
-							pr_number: review.id,
-							blamevec: blamevec,
-						};
-						prvec.push(hmapitem);
-					}
-					Err(e) => {
-						eprint!("Unable to process diff : {e}");
-						einfo.record_err(e.to_string().as_str());
-					}
+pub(crate) fn unfinished_tasks(reviews: Reviews, repo_dirname: &str, einfo: &mut RuntimeInfo) -> HunkMap {
+	let mut prvec = Vec::<PrHunkItem>::new();
+	for review in reviews.reviews {
+		let fileopt = get_excluded_files(&review.base_head_commit, &review.pr_head_commit, repo_dirname, einfo);
+		if fileopt.is_some() {
+			let (bigfiles, smallfiles) = fileopt.expect("Validated fileopt");
+			let diffmap = generate_diff(&review.base_head_commit, &review.pr_head_commit, &smallfiles, repo_dirname, einfo);
+			let diffres = process_diff(&diffmap);
+			match diffres {
+				Ok(linemap) => {
+					let blamevec = generate_blame(&review.base_head_commit, &linemap, repo_dirname, einfo);
+					let hmapitem = PrHunkItem {
+						pr_number: review.id,
+						blamevec: blamevec,
+					};
+					prvec.push(hmapitem);
+				}
+				Err(e) => {
+					eprint!("Unable to process diff : {e}");
+					einfo.record_err(e.to_string().as_str());
 				}
 			}
 		}
-		let (repo_name, repo_owner) = process_reposlug(repo_slug);
-		let hunkmap = HunkMap { repo_provider: provider.to_string(),
-			repo_owner: repo_owner, repo_name: repo_name, prhunkvec: prvec };
-		store_hunkmap(hunkmap, einfo);
 	}
+	let (repo_name, repo_owner) = process_reposlug(reviews.repo_slug.as_str());
+	let hunkmap = HunkMap { repo_provider: reviews.provider,
+		repo_owner: repo_owner, repo_name: repo_name, prhunkvec: prvec };
+	hunkmap
 }

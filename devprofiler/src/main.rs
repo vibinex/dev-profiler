@@ -1,198 +1,195 @@
-mod reader;
-use crate::reader::UserInput;
-mod analyzer;
-use crate::analyzer::RepoAnalyzer;
-mod writer;
-use crate::writer::OutputWriter;
-mod observer;
-use crate::observer::RuntimeInfo;
-mod scanner;
-use crate::scanner::RepoScanner;
+use google_cloud_auth::credentials::CredentialsFile;
+use google_cloud_default::WithAuthExt;
+use google_cloud_googleapis::pubsub::v1::PubsubMessage;
+use serde::{Serialize, Deserialize};
+use serde_json;
+use std::collections::HashMap;
+use futures_util::StreamExt;
+use serde_json::Result as JsonResult;
+use google_cloud_pubsub::{
+    client::{Client, ClientConfig},
+    subscription::SubscriptionConfig,
+};
+
 mod reviewer;
 use crate::reviewer::unfinished_tasks;
-use std::process;
-use std::path::Path;
-use serde::{Serialize};
-use std::collections::HashSet;
-use std::io::Write;
-use std::io;
-use clap::Parser;
-use std::path::PathBuf;
-
-
-#[derive(Parser)]
-struct Cli {
-    /// Specify arg parsing mode for cli
-    provider: Option<String>,
-	/// path scanned for repositories
-    path: Option<PathBuf>,
-	//// repository name and owner
-	repo_slug: Option<String>,
+use crate::reviewer::Reviews;
+mod observer;
+use crate::observer::RuntimeInfo;
+#[derive(Serialize, Deserialize, Debug)]
+struct GitUrl {
+    git_urls: HashMap<String, String>,
 }
 
-#[derive(Debug, Serialize, Default)]
-struct UserAlias {
-	alias: Vec::<String>
+async fn send_message_to_topic(config: ClientConfig, topicname: &str, message: &str, msgtype: &str) {
+    let client = Client::new(config).await.expect("Unable to create pubsub client to publish messages");
+    let mut pbmsg = PubsubMessage {
+        data: message.into(),
+        ..Default::default()
+    };
+    pbmsg.attributes.insert("msg_type".to_string(), msgtype.to_string());
+    let topic = client.topic(topicname);
+    let publisher = topic.new_publisher(None);
+    match publisher.publish(pbmsg).await.get().await {
+        Ok(_) => {
+            println!("Message published successfully");
+        }
+        Err(err) => {
+            eprintln!("Failed to publish message: {:?}", err);
+        }
+    }
 }
 
-fn process_repos(user_paths: Vec::<String>, einfo: &mut RuntimeInfo, writer: &mut OutputWriter, repo_slug: Option<String>, provider: Option<String>) -> Vec::<String> {
-	let mut valid_repo = 0;
-	let mut all_aliases = HashSet::<String>::new();
-	let num_user_path = user_paths.len();
-	let mut count = 0;
-	// TODO - optimize count and iterating of vector user_path, get index in for loop
-	for p in user_paths {
-		count += 1;
-		print!("Scanning [{count}/{num_user_path}] \r");
-		let _res = io::stdout().flush();
-		let ranalyzer_res = RepoAnalyzer::new(p.as_str().as_ref(), &repo_slug, &provider);
-		match ranalyzer_res {
-			Ok(ranalyzer) => {
-				valid_repo += 1;
-				let anal_res = ranalyzer.analyze(writer, einfo);
-				match anal_res {
-					Ok(aliases) => { all_aliases.extend(aliases); },
-					Err(anal_err) => {
-						einfo.record_err(anal_err
-							.to_string().as_str().as_ref());
-					}
-				}
-			},
-			Err(ranalyzer_err) => {
-				eprintln!("Unable to parse {p} due to error : {ranalyzer_err}");
-				einfo.record_err(ranalyzer_err
-					.to_string().as_str().as_ref());
-			}
-		}
-	}
-	if valid_repo == 0 {
-		let err_line = "Unable to parse any provided repo(s)";
-		eprintln!("{err_line}");
-		einfo.record_err(err_line);
-		process::exit(1);
-	}
-	let alias_vec = all_aliases.into_iter().collect();
-	alias_vec
+async fn request_git_urls(repo_owner: &str, keypath: &str) {
+    let topicname = format!("{}-toserver", repo_owner);
+    let mut msgmap = HashMap::<String, String>::new();
+    msgmap.insert("user_token".to_string(), repo_owner.to_string());
+    let message = serde_json::to_string(&msgmap).expect("Failed to serialize git get request");
+    let config = get_pubsub_client_config(keypath).await;
+    send_message_to_topic(config, &topicname, &message, "GetGitUrl").await;
 }
 
-fn process_aliases(alias_vec: Vec::<String>, einfo: &mut RuntimeInfo, writer: &mut OutputWriter, dockermode: bool) {
-	match dockermode {
-		true => {
-			let alias_obj = UserAlias{ alias: alias_vec };
-			let alias_str = serde_json::to_string(&alias_obj).unwrap_or_default();
-			match writer.writeln(alias_str.as_str().as_ref()) {
-				Ok(_) => {},
-				Err(writer_err) => {
-					eprintln!("Unable to record user aliases in output file : {writer_err}");
-					einfo.record_err(writer_err.to_string().as_str().as_ref());
-					let _res = writer.finish(); // result doesn't matter since already in error
-					process::exit(1);
-				}
-			}
-		}
-		false => {
-			match UserInput::alias_selector(alias_vec) {
-				Ok(user_aliases) => {
-					let alias_obj = UserAlias{ alias: user_aliases };
-					let alias_str = serde_json::to_string(&alias_obj).unwrap_or_default();
-					match writer.writeln(alias_str.as_str().as_ref()) {
-						Ok(_) => {},
-						Err(writer_err) => {
-							eprintln!("Unable to record user aliases in output file : {writer_err}");
-							einfo.record_err(writer_err.to_string().as_str().as_ref());
-							let _res = writer.finish(); // result doesn't matter since already in error
-							process::exit(1);
-						}
-					}
-				}
-				Err(error) => { 
-					eprintln!("Unable to process user aliases : {:?}", error);
-					einfo.record_err(error.to_string().as_str().as_ref());
-					let _res = writer.finish(); // result doesn't matter since already in error
-					process::exit(1); 
-				}
-			}
-		}
-	}	
+async fn clone_git_repo(git_urls: HashMap<String, String>) {
+    for (repo_name, git_url) in git_urls {
+        let directory = format!("/app/{repo_name}");
+        let mut cmd = std::process::Command::new("git");
+        cmd.arg("clone").arg(git_url).current_dir(directory);
+        let output = cmd.output().expect("Failed to clone git repo");
+        println!("Git clone output: {:?}", output);
+    }
 }
 
-fn main() {
-	let args = Cli::parse();
-	let mut dockermode = false;
-	match args.provider {
-		Some(ref argval) => {
-			if argval == "github" || argval == "bitbucket" {
-				dockermode = true;
-			}
-		}
-		None => {}
-	}
-	match OutputWriter::new() {
-		Ok(mut writer) => {
-			match dockermode {
-				true => {
-					let einfo = &mut RuntimeInfo::new();
-					unfinished_tasks(args.provider.as_ref().expect("Provider exists, checked"), args.repo_slug.as_ref().expect("No repo_slug"), einfo);
-					let writer_mut: &mut OutputWriter = &mut writer;
-					let einfo = &mut RuntimeInfo::new();
-					let scan_pathbuf = match args.path {
-						Some(scan_pathbuf) => scan_pathbuf,
-						None => Path::new("/").to_path_buf()
-					};
-					let rscanner = RepoScanner::new(scan_pathbuf);
-					let pathsvec = rscanner.scan(einfo, writer_mut, dockermode);
-					let alias_vec = process_repos(pathsvec, einfo, writer_mut, args.repo_slug, args.provider);
-					process_aliases(alias_vec, einfo, writer_mut, dockermode);
-					let _res = einfo.write_runtime_info(writer_mut);
-					match writer.finish() {
-						Ok(_) => {
-							println!("Extracted and uploaded metadata successfully! Proceed to https://vibinex.com/ to learn more");
-						},
-						Err(error) => {
-							eprintln!("Unable to write to output : {error}");
-						}
-					}
-				}
-				false => {
-					match UserInput::scan_path() {
-						Ok(scan_path_str) => {
-							let writer_mut: &mut OutputWriter = &mut writer;
-							let einfo = &mut RuntimeInfo::new();
-							let scan_pathbuf = Path::new(&scan_path_str).to_path_buf();
-							let rscanner = RepoScanner::new(scan_pathbuf);
-							let pathsvec = rscanner.scan(einfo, writer_mut, dockermode);
-							match UserInput::repo_selection(pathsvec) {
-								Ok(user_paths) => {
-									let alias_vec = process_repos(user_paths, einfo, writer_mut, None, None);
-									process_aliases(alias_vec, einfo, writer_mut, dockermode);
-									let _res = einfo.write_runtime_info(writer_mut);
-									match writer.finish() {
-										Ok(_) => {
-											println!("Extracted and uploaded metadata successfully! Proceed to https://vibinex.com/ to learn more");
-										},
-										Err(error) => {
-											eprintln!("Unable to write to output : {error}");
-										}
-									}
-								},
-								Err(error) => {
-									eprintln!("Unable to process repository selection : {error}");
-								}
-							} 
-						},
-						Err(error) => {
-							eprintln!("Unable to write to present directory : {error}");
-						}
-					}
-				}
-			}
-		},
-		Err(error) => {
-			eprintln!("Unable to start application : {error}");
-		}
-	}
+async fn listen_messages(keypath: &str, topicname: &str, subscriptionname: &str, publishtopic: &str, einfo: &mut RuntimeInfo) {
+    let config = get_pubsub_client_config(keypath).await;
+    let client = Client::new(config).await.expect("Unable to create pubsub client to listen to messages");
+    let topic = client.topic(topicname);
+    let subconfig = SubscriptionConfig {
+        enable_message_ordering: true,
+        ..Default::default()
+    };
+    let subscription = client.subscription(subscriptionname);
+    if !subscription.exists(None).await.expect("Unable to get subscription information") {
+        subscription.create(
+            topic.fully_qualified_name(), subconfig, None)
+            .await.expect("Unable to create subscription for listening to messages");
+    }
+    let mut stream = subscription.subscribe(None).await.expect("Unable to subscribe to messages");
+    let mut repo_list: Vec<String> = Vec::new();
+    while let Some(message) = stream.next().await {
+        let attrmap: HashMap<String, String> = message.message.attributes.clone().into_iter().collect();
+        match attrmap.get("msg_type") {
+            Some(msgtype) => {
+                match msgtype.as_str() {
+                    "GitUrl" => {
+                        // Convert the data from base64 to a string
+                        let payload = String::from_utf8(message.message.data.clone()).unwrap();
+
+                        // Deserialize the JSON payload into a struct
+                        let result: JsonResult<GitUrl> = serde_json::from_str(&payload);
+
+                        let giturls = result.expect("Failed to deserialize GitUrl message").git_urls;
+                        if giturls.len() > 0 {
+                            clone_git_repo(giturls.clone()).await;
+                            for k in giturls.keys() {
+                                repo_list.push(k.clone());
+                            }
+                        }
+                        else {
+                            eprintln!("No git urls found for user");
+                        }
+                    }
+                    "PRMessage" => {
+                        let payload = String::from_utf8(message.message.data.clone()).unwrap();
+                        let result: JsonResult<Reviews> = serde_json::from_str(&payload);
+                        match result {
+                            Ok(prmsg) => {
+                                let repo_key = prmsg.repo_slug.clone();
+                                if repo_list.contains(&repo_key) {
+                                    let hunks = unfinished_tasks(prmsg, repo_key.as_str(), einfo);
+                                    let message = serde_json::to_string(&hunks).expect("Failed to serialize Hunks");
+                                    send_message_to_topic(
+                                        get_pubsub_client_config(keypath).await,
+                                        publishtopic, &message, "HunkInfo").await;
+                                }
+                                else {
+                                    eprintln!("Repo not found in repo list");
+                                }
+                            }
+                            Err(err) => {
+                                eprintln!("Failed to deserialize PRMessage: {:?}", err);
+                            }
+                        }
+                    }
+                    _ => {
+                        eprintln!("Message type not found for message : {:?}", message.message.attributes);
+                    }
+                };
+            },
+            None => {
+                eprintln!("Message type not found for message : {:?}", message.message.data);
+            }
+        };
+        // Ack or Nack message.
+        let _ = message.ack().await;
+    }
 }
-// git diff a9e58c7 8433a5e -U0
-// git blame a9e58c7 -L 121,+5 -e --date=unix devprofiler/src/main.rs
-// git diff a9e58c7:devprofiler/src/analyzer.rs 8433a5e:devprofiler/src/analyzer.rs'
-// git diff a9e58c7 8433a5e --stat
+
+#[tokio::main]
+async fn main() {
+    // let url = "https://gcscruncsql-k7jns52mtq-el.a.run.app/onprem/authenticate";
+
+    // // Create a reqwest client
+    // let client = reqwest::Client::new();
+
+    // // Send a POST request to the authentication endpoint
+    // let response = client.post(url).send().await
+    //     .expect("Failed to send Vibinex authentication request");
+    
+    let einfo = &mut RuntimeInfo::new();
+
+    // Check if the request was successful
+    // if response.status().is_success() {
+        // Get the service account JSON key from the response body
+        // let service_account_key = response.text().await
+        //     .expect("Failed to get service account key");
+        println!("Authentication successful!");
+        // Use the service account key for authentication with GCP Pub/Sub and get the client object
+        let keypath = "/app/pubsub-sa.json".to_string();
+        // dump_pubsub_key(service_account_key);
+        let repo_owner = "rtapish".to_string();
+        // env::var("REPO_OWNER").expect("Missing REPO_OWNER environment variable");
+        // let git_token = env::var("GIT_TOKEN").expect("Missing GIT_TOKEN environment variable");
+        // let pubsub_topic = env::var("PUBSUB_TOPIC").expect("Missing PUBSUB_TOPIC environment variable");
+        // let provider = env::var("PROVIDER").expect("Missing PROVIDER environment variable");
+        let kpclone = keypath.clone();
+        let ownerclone = repo_owner.clone();
+        tokio::spawn(async move {
+            request_git_urls(&ownerclone, kpclone.as_str()).await;
+        });
+        listen_messages(&keypath,
+            format!("{}-fromserver", repo_owner).as_str(),
+            format!("{}-fromserver-sub", repo_owner).as_str(),
+            format!("{}-toserver", repo_owner).as_str(),
+            einfo).await;
+
+        // Keep the main thread alive
+        tokio::signal::ctrl_c().await.unwrap();
+    // } else {
+    //     println!("Vibinex Authentication failed with status code: {}", response.status());
+    // }
+}
+
+async fn get_pubsub_client_config(keypath: &str) -> ClientConfig {
+    let credfile = CredentialsFile::new_from_file(keypath.to_string()).await.expect("Failed to locate credentials file");
+    return ClientConfig::default()
+        .with_credentials(credfile)
+        .await
+        .unwrap();
+}
+
+fn dump_pubsub_key(service_account_key: String) -> String {
+    // Dump service account key to /tmp/service_account.json and return the path
+    let keypath = "/tmp/service_account.json";
+    std::fs::write(keypath, service_account_key).expect("Failed to write service account key to file");
+    return String::from(keypath);
+}

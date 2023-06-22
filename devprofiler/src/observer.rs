@@ -1,4 +1,3 @@
-use crate::writer::OutputWriter;
 use serde::Serialize;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -25,9 +24,5 @@ impl RuntimeInfo {
     }
     pub fn record_err(&mut self, estr: &str) {
         self.errors.push(estr.to_string());
-    }
-    pub fn write_runtime_info(&self, writer: &mut OutputWriter) -> Result<(), std::io::Error>{
-        let serialized = serde_json::to_string(&self).unwrap_or_default();
-        writer.writeln(serialized.as_str().as_ref())
     }
 }

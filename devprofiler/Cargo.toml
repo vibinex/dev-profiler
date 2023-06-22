@@ -14,18 +14,17 @@ categories = ["command-line-utilities"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-git2 = {version = "0.15", default-features = false, features= ["vendored-libgit2"]}
-detect-lang = "0.1.5"
-clap = {version = "4.1.4", features = ["derive"]}
+tokio = { version = "1.28.2", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-flate2 = "1.0"
-sha2 = "0.10"
 base64ct = "1.5.3"
 sha256 = "1.1.1"
-walkdir = "2"
-inquire = "0.5.2"
-pkg-config = "0.3.26"
-reqwest = { version = "0.11", features = ["blocking", "json"] }
+reqwest = { version = "0.11", features = ["json", "blocking"] }
+google-cloud-pubsub = "0.15.0"
+google-cloud-default = { version = "0.3.0", features = ["pubsub"] }
+google-cloud-googleapis = "0.9.0"
+google-cloud-auth = "0.10.0"
+futures-util = "0.3.28"
+tokio-util = "0.7.8"
 
 # todo - check all lib licences
