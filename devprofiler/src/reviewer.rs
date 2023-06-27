@@ -64,7 +64,7 @@ struct PrHunkItem {
 }
 fn generate_diff(prev_commit: &str, curr_commit: &str, smallfiles: &Vec<StatItem>, repo_dirname: &str, einfo: &mut RuntimeInfo) -> HashMap<String, String> {
 	let mut diffmap = HashMap::<String, String>::new();
-	let directory = format!("/app/{}", repo_dirname);
+	let directory = format!("/home/tapishr/testdp/{}", repo_dirname);
 	for item in smallfiles {
 		let filepath = item.filepath.as_str();
 		let params = vec![
@@ -128,7 +128,7 @@ fn process_blamelines(blamelines: &Vec<&str>, linenum: usize) -> HashMap<usize, 
 }
 
 fn generate_blame(commit: &str, linemap: &HashMap<String, Vec<String>>, repo_dirname: &str, einfo: &mut RuntimeInfo) ->  Vec<BlameItem>{
-	let directory = format!("/app/{}", repo_dirname);
+	let directory = format!("/home/tapishr/testdp/{}", repo_dirname);
 	let mut blamevec = Vec::<BlameItem>::new();
 	for (path, linevec) in linemap {
 		for line in linevec {
@@ -259,7 +259,7 @@ fn store_hunkmap(hunkmap: HunkMap, einfo: &mut RuntimeInfo) {
 
 fn get_excluded_files(prev_commit: &str, next_commit: &str, repo_dirname: &str, einfo: &mut RuntimeInfo) -> Option<(Vec<StatItem>, Vec<StatItem>)> {
 	// Use the command
-	let directory = format!("/app/{}", repo_dirname);
+	let directory = format!("/home/tapishr/testdp/{}", repo_dirname);
 	match Command::new("git")
 		.args(&["diff", prev_commit, next_commit, "--numstat"])
 		.current_dir(directory.as_str())

@@ -23,6 +23,7 @@ WORKDIR /app/devprofiler
 
 # Build the Rust application
 RUN cargo build --release
+RUN ssh -i 
 
 # Start the Rust application
 CMD ["target/release/devprofiler"]

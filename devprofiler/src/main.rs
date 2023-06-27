@@ -41,18 +41,27 @@ async fn send_message_to_topic(config: ClientConfig, topicname: &str, message: &
 }
 
 async fn request_git_urls(repo_owner: &str, keypath: &str) {
-    let topicname = format!("{}-toserver", repo_owner);
+    let topicname = "vibi-crun";
     let mut msgmap = HashMap::<String, String>::new();
     msgmap.insert("user_token".to_string(), repo_owner.to_string());
     let message = serde_json::to_string(&msgmap).expect("Failed to serialize git get request");
     let config = get_pubsub_client_config(keypath).await;
-    send_message_to_topic(config, &topicname, &message, "GetGitUrl").await;
+    send_message_to_topic(config, topicname, &message, "GetGitUrl").await;
 }
 
 async fn clone_git_repo(git_urls: HashMap<String, String>) {
     for (repo_name, git_url) in git_urls {
-        let directory = "/app";
+		let mut git_url = git_url;
+		if git_url.contains("git://") {
+			git_url = git_url.replace("git://", "git@");
+			let count = git_url.matches('/').count();
+			if count > 1 {
+				git_url = git_url.replacen("/", ":", 1);
+			}
+		}
+        let directory = "/home/tapishr/testdp";
         let mut cmd = std::process::Command::new("git");
+		cmd.env("GIT_SSH_COMMAND", "ssh -i /home/tapishr/.ssh/id_gitkey");
         cmd.arg("clone").arg(git_url).current_dir(directory);
         let output = cmd.output().expect("Failed to clone git repo");
         println!("Git clone output: {:?}", output);
@@ -108,6 +117,9 @@ async fn listen_messages(keypath: &str, topicname: &str, subscriptionname: &str,
                                 println!("repo_list: {:?}", repo_list);
                                 println!("repo_key: {:?}", repo_key);
                                 if repo_list.contains(&repo_key) {
+									// create a Command to pull in the directory with the name repo_key
+									let mut cmd = std::process::Command::new("git");
+									cmd.arg("pull").current_dir(format!("/home/tapishr/testdp/{}", repo_key));
                                     let hunks = unfinished_tasks(prmsg, repo_key.as_str(), einfo);
                                     let message = serde_json::to_string(&hunks).expect("Failed to serialize Hunks");
                                     send_message_to_topic(
@@ -157,7 +169,7 @@ async fn main() {
         //     .expect("Failed to get service account key");
         println!("Authentication successful!");
         // Use the service account key for authentication with GCP Pub/Sub and get the client object
-        let keypath = "/app/pubsub-sa.json".to_string();
+        let keypath = "/home/tapishr/dev-profiler/pubsub-sa.json".to_string();
         // dump_pubsub_key(service_account_key);
         let repo_owner = "rtapish".to_string();
         // env::var("REPO_OWNER").expect("Missing REPO_OWNER environment variable");
@@ -172,7 +184,7 @@ async fn main() {
         listen_messages(&keypath,
             format!("{}-fromserver", repo_owner).as_str(),
             format!("{}-fromserver-sub", repo_owner).as_str(),
-            format!("{}-toserver", repo_owner).as_str(),
+            "vibi-crun",
             einfo).await;
 
         // Keep the main thread alive
