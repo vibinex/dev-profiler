@@ -96,13 +96,18 @@ fn process_blamelines(blamelines: &Vec<&str>, linenum: usize) -> HashMap<usize, 
 		let mut author = wordvec[1];
 		let mut timestamp = wordvec[2];
 		let mut idx = 1;
-		if author == "" {
+		// Check if the second value is an email address (enclosed in angle brackets)
+		if !author.starts_with('<') && !author.ends_with('>') {
+			// Shift the index to the next non-empty value
 			while idx < wordvec.len() && wordvec[idx] == "" {
-				idx = idx + 1;
+				idx += 1;
 			}
 			if idx < wordvec.len() {
 				author = wordvec[idx];
 			}
+		} else {
+			// Remove the angle brackets from the email address
+			author = author.trim_start_matches('<').trim_end_matches('>');
 		}
 		let authorstr = author.replace("(", "")
 			.replace("<", "")
