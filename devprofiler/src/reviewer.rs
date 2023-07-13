@@ -97,9 +97,9 @@ fn process_blamelines(blamelines: &Vec<&str>, linenum: usize) -> HashMap<usize, 
 		let mut timestamp = wordvec[2];
 		let mut idx = 1;
 		// Check if the second value is an email address (enclosed in angle brackets)
-		if !author.starts_with('<') && !author.ends_with('>') {
+		if !author.starts_with('(') && !author.ends_with('>') {
 			// Shift the index to the next non-empty value
-			while idx < wordvec.len() && wordvec[idx] == "" {
+			while idx < wordvec.len() && (wordvec[idx] == "" || !wordvec[idx].starts_with('(')){
 				idx += 1;
 			}
 			if idx < wordvec.len() {
@@ -112,9 +112,9 @@ fn process_blamelines(blamelines: &Vec<&str>, linenum: usize) -> HashMap<usize, 
 		let authorstr = author.replace("(", "")
 			.replace("<", "")
 			.replace(">", "");
-		if timestamp == "" {
+		if timestamp == "" || timestamp.starts_with('(') {
 			idx = idx + 1;
-			while idx < wordvec.len() && wordvec[idx] == "" {
+			while idx < wordvec.len() && (wordvec[idx] == "" || wordvec[idx].starts_with('(')) {
 				idx = idx + 1;
 			}
 			if idx < wordvec.len() {
