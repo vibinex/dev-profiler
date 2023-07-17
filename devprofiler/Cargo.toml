@@ -11,7 +11,9 @@ repository = "https://github.com/Alokit-Innovations/dev-profiler"
 keywords = ["cli", "tools", "git"]
 categories = ["command-line-utilities"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html    
+[dev-dependencies]
+dotenv = "0.15"
 
 [dependencies]
 tokio = { version = "1.28.2", features = ["full"] }
@@ -27,5 +29,6 @@ google-cloud-auth = "0.10.0"
 futures-util = "0.3.28"
 tokio-util = "0.7.8"
 sled = "0.34.7"
+uuid = { version = "1.4.0", features = ["v4"]}
 
 # todo - check all lib licences
