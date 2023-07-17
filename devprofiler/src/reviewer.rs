@@ -148,6 +148,9 @@ fn generate_blame(commit: &str, linemap: &HashMap<String, Vec<String>>, repo_dir
 					match str::from_utf8(&blame) {
 						Ok(blamestr) => {
 							let blamelines: Vec<&str> = blamestr.lines().collect();
+							if blamelines.len() == 0 {
+								continue;
+							}
 							let linenumint = linenum.parse::<usize>().expect("Unable to parse linenum");
 							let lineauthormap = process_blamelines(&blamelines, linenumint);
 							let mut linebreak = linenumint;
@@ -367,26 +370,30 @@ fn process_diff(diffmap: &HashMap<String, String>) -> Result<HashMap<String, Vec
 	return Ok(linemap);
 }
 
-pub(crate) fn unfinished_tasks(reviews: Reviews, repo_dirname: &str, einfo: &mut RuntimeInfo) -> HunkMap {
-	let mut prvec = Vec::<PrHunkItem>::new();
-	for review in reviews.reviews {
-		let fileopt = get_excluded_files(&review.base_head_commit, &review.pr_head_commit, repo_dirname, einfo);
-		if fileopt.is_some() {
-			let (bigfiles, smallfiles) = fileopt.expect("Validated fileopt");
-			let diffmap = generate_diff(&review.base_head_commit, &review.pr_head_commit, &smallfiles, repo_dirname, einfo);
-			let diffres = process_diff(&diffmap);
-			match diffres {
-				Ok(linemap) => {
-					let blamevec = generate_blame(&review.base_head_commit, &linemap, repo_dirname, einfo);
-					let hmapitem = PrHunkItem {
-						pr_number: review.id,
-						blamevec: blamevec,
-					};
-					prvec.push(hmapitem);
-				}
-				Err(e) => {
-					eprint!("Unable to process diff : {e}");
-					einfo.record_err(e.to_string().as_str());
+pub(crate) fn unfinished_tasks(provider: &str, repo_slug: &str, einfo: &mut RuntimeInfo) {
+	let reviews = get_tasks(provider, repo_slug, einfo);
+	if reviews.is_some() {
+		let mut prvec = Vec::<PrHunkItem>::new();
+		for review in reviews.expect("Validated reviews").reviews {
+			println!("Processing PR : {}", review.id);
+			let fileopt = get_excluded_files(&review.base_head_commit, &review.pr_head_commit, einfo);
+			if fileopt.is_some() {
+				let (bigfiles, smallfiles) = fileopt.expect("Validated fileopt");
+				let diffmap = generate_diff(&review.base_head_commit, &review.pr_head_commit, &smallfiles, einfo);
+				let diffres = process_diff(&diffmap);
+				match diffres {
+					Ok(linemap) => {
+						let blamevec = generate_blame(&review.base_head_commit, &linemap, einfo);
+						let hmapitem = PrHunkItem {
+							pr_number: review.id,
+							blamevec: blamevec,
+						};
+						prvec.push(hmapitem);
+					}
+					Err(e) => {
+						eprint!("Unable to process diff : {e}");
+						einfo.record_err(e.to_string().as_str());
+					}
 				}
 			}
 		}
