@@ -5,6 +5,7 @@ use std::str;
 use std::collections::HashMap;
 use sha256::digest;
 use crate::observer::RuntimeInfo;
+use regex::Regex;
 
 #[derive(Debug, Serialize, Default, Deserialize)]
 struct Reviews {
@@ -96,15 +97,13 @@ fn process_blamelines(blamelines: &Vec<&str>, linenum: usize) -> HashMap<usize, 
 		let mut author = wordvec[1];
 		let mut timestamp = wordvec[2];
 		let mut idx = 1;
-		// Check if the second value is an email address (enclosed in angle brackets)
-		if !author.starts_with('(') && !author.ends_with('>') {
-			// Shift the index to the next non-empty value
-			while idx < wordvec.len() && (wordvec[idx] == "" || !wordvec[idx].starts_with('(')){
-				idx += 1;
-			}
-			if idx < wordvec.len() {
-				author = wordvec[idx];
-			}
+		
+		// Check if the second value is an email address using the below regex
+		let pattern = r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?:\.[A-Za-z]{2,})*";
+		// Create a Regex object
+		let regex = Regex::new(pattern).unwrap();
+		if let Some(result) = wordvec.iter().find(|value| regex.is_match(value)) {
+			author = result
 		} else {
 			// Remove the angle brackets from the email address
 			author = author.trim_start_matches('<').trim_end_matches('>');
