@@ -99,7 +99,7 @@ fn process_blamelines(blamelines: &Vec<&str>, linenum: usize) -> HashMap<usize, 
 		let mut idx = 1;
 		
 		// Check if the second value is an email address using the below regex
-		let pattern = r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?:\.[A-Za-z]{2,})*";
+		let pattern = r".+@.+\..+";
 		// Create a Regex object
 		let regex = Regex::new(pattern).unwrap();
 		if let Some(result) = wordvec.iter().find(|value| regex.is_match(value)) {
