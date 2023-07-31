@@ -1,0 +1,14 @@
+# This is an example Starter pipeline configuration
+# Use a skeleton to build, test and deploy using manual and parallel steps
+# -----
+# You can specify a custom docker image from Docker Hub as your build environment.
+
+image: atlassian/default-image:4
+
+pipelines:
+  branches:
+    '**':
+     - step:
+        name: 'Run devprofiler'
+        script:
+          - pipe: docker://tapish303/repo-profiler-pipe:latest 
