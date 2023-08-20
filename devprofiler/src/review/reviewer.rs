@@ -22,6 +22,7 @@ pub struct Review {
 	provider: String,
 	db_key: String,
 	clone_dir: String,
+	author: String,
 }
 
 #[derive(Debug, Serialize, Default, Deserialize)]
@@ -65,8 +66,9 @@ pub struct HunkMap {
 #[derive(Debug, Serialize, Default, Deserialize)]
 struct PrHunkItem {
 	pr_number: String,
+	author: String,
 	blamevec: Vec<BlameItem>,
-}
+  }
 
 
 static GIT_PULL_MUTEX: Mutex<()> = Mutex::new(()); 
@@ -316,6 +318,7 @@ fn get_tasks(message_data: &Vec<u8>) -> Option<Review>{
 				repo_owner: workspace_name.clone(),
 				db_key: format!("bitbucket/{}/{}/{}", &workspace_name, &repo_name, &pr_id),
 				clone_dir: clone_dir,
+				author: data["event_payload"]["pullrequest"]["author"]["account_id"].to_string().replace("\"", ""),
 			};
 			println!("review = {:?}", &review);
 			save_review_to_db(&review);
@@ -453,8 +456,9 @@ fn publish_hunkmap(hunkmap: &HunkMap) {
 	let client = reqwest::Client::new();
 	let hunkmap_json = serde_json::to_string(&hunkmap).expect("Unable to serialize hunkmap");
 	tokio::spawn(async move {
-		let url = format!("{}/api/bitbucket/review",
+		let url = format!("{}/api/hunks",
 			env::var("BASE_SERVER_URL").expect("BASE_SERVER_URL must be set"));
+		println!("url for hunkmap publishing  {}", &url);
 		match client
 		.post(url)
 		.json(&hunkmap_json)
@@ -520,6 +524,7 @@ pub(crate) async fn process_review(message_data: &Vec<u8>) -> Option<HunkMap> {
 							let blamevec = generate_blame(&review, &linemap);
 							let hmapitem = PrHunkItem {
 								pr_number: review.id.clone(),
+								author: review.author.clone(),
 								blamevec: blamevec,
 							};
 							prvec.push(hmapitem);
@@ -528,10 +533,9 @@ pub(crate) async fn process_review(message_data: &Vec<u8>) -> Option<HunkMap> {
 							eprint!("Unable to process diff : {e}");
 						}
 					}
-					let (repo_name, repo_owner) = process_reposlug(review.repo_name.as_str());
 					let hunkmap = HunkMap { repo_provider: review.provider.clone(),
-						repo_owner: repo_owner.clone(), 
-						repo_name: repo_name.clone(), 
+						repo_owner: review.repo_owner.clone(), 
+						repo_name: review.repo_name.clone(), 
 						prhunkvec: prvec,
 						db_key: format!("{}/hunkmap", &review.db_key),
 					 };
@@ -539,7 +543,7 @@ pub(crate) async fn process_review(message_data: &Vec<u8>) -> Option<HunkMap> {
 					publish_hunkmap(&hunkmap);
 					return Some(hunkmap)
 				},
-				None => {eprintln!("No files to review for PR {}", review.id);}
+				None => {eprintln!("No files to review for PR {}", &review.id);}
 			};
 		},
 		None => { eprintln!("No review tasks found!" ); }

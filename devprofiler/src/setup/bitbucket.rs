@@ -503,7 +503,6 @@ pub async fn handle_install_bitbucket(installation_code: &str) {
                     &access_token_async,
                     "OPEN").await;
             });
-            
         }
         
     } 

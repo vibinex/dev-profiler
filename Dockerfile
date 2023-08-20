@@ -27,5 +27,8 @@ ENV BITBUCKET_CLIENT_ID=$BITBUCKET_CLIENT_ID
 ENV BITBUCKET_CLIENT_SECRET=$BITBUCKET_CLIENT_SECRET
 ENV BITBUCKET_BASE_URL=$BITBUCKET_BASE_URL
 
+COPY ./devprofiler/target/debug/devprofiler /app/devprofiler
+COPY ./pubsub-sa.json /app/pubsub-sa.json
+
 # Start the Rust application
 CMD ["/app/devprofiler"]
