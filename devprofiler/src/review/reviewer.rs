@@ -2,13 +2,13 @@ use serde::{Serialize, Deserialize};
 use sled::IVec;
 use std::error::Error;
 use std::process::Command;
-use std::{str, env};
+use std::{str, env, clone};
 use std::collections::HashMap;
 use sha256::digest;
 use std::sync::Mutex;
 use serde_json::Value;
 use crate::db;
-use crate::setup::bitbucket::{Repository, AuthInfo};
+use crate::setup::bitbucket::{Repository, refresh_git_auth};
 use crate::db::get_db;
 
 
@@ -22,6 +22,7 @@ pub struct Review {
 	provider: String,
 	db_key: String,
 	clone_dir: String,
+	clone_url: String,
 	author: String,
 }
 
@@ -84,9 +85,10 @@ fn commit_exists(commit: &str) -> bool {
 	output.status.success()
 }
 
-fn git_pull(review: &Review) {
+async fn git_pull(review: &Review) {
 	let directory = review.clone_dir.clone();
 	println!("directory = {}", &directory);
+	refresh_git_auth(&review.clone_url, &review.clone_dir).await;
 	let output = Command::new("git")
 		.arg("pull")
 		// .arg("--all") 
@@ -265,28 +267,16 @@ pub(crate) fn process_reposlug(repo_slug: &str) -> (String, String) {
 	return (repo_name.to_string(), repo_owner.to_string());
 }
 
-fn get_access_token(authinfo: &AuthInfo) -> String {
-	let token = authinfo.access_token.clone();
-    return token;
-}
-
-fn get_clone_url_clone_dir(repo_provider: &str, workspace_name: &str, repo_name: &str) -> String {
+fn get_clone_url_clone_dir(repo_provider: &str, workspace_name: &str, repo_name: &str) -> (String, String) {
 	let db = db::get_db();
 	let key = format!("{}/{}/{}", repo_provider, workspace_name, repo_name);
 	let repo_opt = db.get(IVec::from(key.as_bytes())).expect("Unable to get repo from db");
 	let repo_ivec = repo_opt.expect("Empty value");
 	let repo: Repository = serde_json::from_slice::<Repository>(&repo_ivec).unwrap();
 	println!("repo = {:?}", &repo);
-	let git_url = repo.clone_ssh_url.clone();
-	let authinfo_key = "bitbucket_auth_info";
-	let authinfo_ivec = db.get(IVec::from(authinfo_key.as_bytes()))
-		.expect("Unable to get bb authinfo from db")
-		.expect("Empty bitbucket authinfo in db");
-	let authinfo: AuthInfo =  
-		serde_json::from_slice(&authinfo_ivec).unwrap();
-	let access_token = get_access_token(&authinfo);
 	let clone_dir = repo.local_dir.expect("No local dir for repo found in db").clone();
-	return clone_dir;
+	let clone_url = repo.clone_ssh_url.clone();
+	return (clone_url, clone_dir);
 }
 
 fn save_review_to_db(review: &Review) {
@@ -302,12 +292,11 @@ fn save_review_to_db(review: &Review) {
 fn get_tasks(message_data: &Vec<u8>) -> Option<Review>{
 	match serde_json::from_slice::<Value>(&message_data) {
 		Ok(data) => {
-			println!("data webhook = {:?}", &data);
 			let repo_provider = data["repository_provider"].to_string().trim_matches('"').to_string();
 			let repo_name = data["event_payload"]["repository"]["name"].to_string().trim_matches('"').to_string();
 			println!("repo NAME == {}", &repo_name);
 			let workspace_name = data["event_payload"]["repository"]["workspace"]["slug"].to_string().trim_matches('"').to_string();
-			let clone_dir = get_clone_url_clone_dir(&repo_provider, &workspace_name, &repo_name);
+			let (clone_url, clone_dir) = get_clone_url_clone_dir(&repo_provider, &workspace_name, &repo_name);
 			let pr_id = data["event_payload"]["pullrequest"]["id"].to_string().trim_matches('"').to_string();
 			let review = Review {
 				repo_name: repo_name.clone(),
@@ -318,6 +307,7 @@ fn get_tasks(message_data: &Vec<u8>) -> Option<Review>{
 				repo_owner: workspace_name.clone(),
 				db_key: format!("bitbucket/{}/{}/{}", &workspace_name, &repo_name, &pr_id),
 				clone_dir: clone_dir,
+				clone_url: clone_url,
 				author: data["event_payload"]["pullrequest"]["author"]["account_id"].to_string().replace("\"", ""),
 			};
 			println!("review = {:?}", &review);
@@ -510,12 +500,12 @@ pub(crate) async fn process_review(message_data: &Vec<u8>) -> Option<HunkMap> {
 			println!("Processing PR : {}", review.id);
 			if !commit_exists(&review.base_head_commit) || !commit_exists(&review.pr_head_commit) {
 				println!("Pulling repository {} for commit history", &review.repo_name);
-				git_pull(&review);
+				git_pull(&review).await;
 			}
 			let fileopt = get_excluded_files(&review);
 			println!("fileopt = {:?}", &fileopt);
 			match fileopt {
-				Some((bigfiles, smallfiles)) => {
+				Some((_, smallfiles)) => {
 					let diffmap = generate_diff(&review, &smallfiles);
 					println!("diffmap = {:?}", &diffmap);
 					let diffres = process_diff(&diffmap);

@@ -32,5 +32,6 @@ sled = "0.34.7"
 uuid = { version = "1.4.0", features = ["v4"]}
 rand = "0.8.5"
 dotenv = "0.15.0"
+chrono = "0.4.26"
 
 # todo - check all lib licences
