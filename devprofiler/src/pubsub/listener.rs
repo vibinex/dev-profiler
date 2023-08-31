@@ -8,12 +8,11 @@ use google_cloud_pubsub::{
     subscription::{SubscriptionConfig, Subscription},
 };
 use serde::Deserialize;
-use serde_json::Value;
 use tokio::task;
 use std::collections::VecDeque;
 use sha256::digest;
-use crate::setup::bitbucket::handle_install_bitbucket;
-use crate::review::reviewer::process_review;
+use tonic::Code;
+use crate::tasks::{setup::handle_install_bitbucket, review::process_review};
 
 #[derive(Debug, Deserialize)]
 struct InstallCallback {
@@ -31,16 +30,29 @@ pub async fn get_pubsub_client_config(keypath: &str) -> ClientConfig {
 }
 
 
-async fn setup_subscription(keypath: &str, topicname: &str, subscriptionname: &str) -> Subscription{
+async fn setup_subscription(keypath: &str, topicname: &str) -> Subscription{
     let config = get_pubsub_client_config(keypath).await;
     let client = Client::new(config).await
         .expect("Unable to create pubsub client to listen to messages");
     let topic = client.topic(topicname);
+    println!("topic = {:?}", &topic);
+    if let Err(e) = topic.exists(None).await {
+        println!("error = {:?}", e);
+        match e.code() == Code::NotFound {
+            true => {
+                // Topic does not exist, create it
+                client.create_topic(topicname, None, None).await.expect("Unable to create topic");
+            }
+            false => { eprintln!("Error getting topic: {:?}", e); }
+        }
+    }
     let subconfig = SubscriptionConfig {
         enable_message_ordering: true,
         ..Default::default()
     };
-    let subscription = client.subscription(subscriptionname);
+    let subscriptionname = format!("{topicname}-sub");
+    let subscription = client.subscription(&subscriptionname);
+    println!("sub = {:?}", &subscription);
     if !subscription.exists(None).await.expect("Unable to get subscription information") {
         subscription.create(
             topic.fully_qualified_name(), subconfig, None)
@@ -48,10 +60,10 @@ async fn setup_subscription(keypath: &str, topicname: &str, subscriptionname: &s
     }
     subscription
 }
-pub async fn listen_messages(keypath: &str, topicname: &str, subscriptionname: &str) {
+pub async fn listen_messages(keypath: &str, topicname: &str) {
     let queue_cap = 100;
     let mut message_hashes = VecDeque::with_capacity(queue_cap);
-    let subscription = setup_subscription(keypath, topicname, subscriptionname).await;
+    let subscription = setup_subscription(keypath, topicname).await;
     let mut stream = subscription.subscribe(None).await
         .expect("Unable to subscribe to messages");
     while let Some(message) = stream.next().await {
