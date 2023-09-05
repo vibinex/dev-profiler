@@ -3,7 +3,7 @@ use dotenv::dotenv;
 use std::env;
 mod pubsub;
 mod db;
-mod tasks;
+mod core;
 mod bitbucket;
 mod utils;
 

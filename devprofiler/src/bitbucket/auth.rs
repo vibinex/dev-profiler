@@ -54,7 +54,7 @@ pub async fn refresh_git_auth(clone_url: &str, directory: &str) -> String{
         Some(mut new_auth_info) => {
             println!("New auth info  = {:?}", &new_auth_info);
             access_token = new_auth_info.access_token().to_string();
-            set_git_url(clone_url, directory, &access_token);
+            set_git_remote_url(clone_url, directory, &access_token);
             save_auth_info_to_db(&mut new_auth_info);
         },
         None => {println!(" No new auth info");},
@@ -121,7 +121,7 @@ async fn bitbucket_refresh_token(
         return None;
 }
 
-fn set_git_url(git_url: &str, directory: &str, access_token: &str) {
+fn set_git_remote_url(git_url: &str, directory: &str, access_token: &str) {
     let clone_url = git_url.to_string()
         .replace("git@", format!("https://x-token-auth:{{{access_token}}}@").as_str())
         .replace("bitbucket.org:", "bitbucket.org/");

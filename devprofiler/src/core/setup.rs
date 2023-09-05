@@ -42,6 +42,7 @@ pub async fn handle_install_bitbucket(installation_code: &str) {
     
         let repos = get_workspace_repos(workspace.uuid(), 
             &access_token).await;
+        get_and_save_workspace_users(workspace.uuid(), &access_token).await;
         let mut reponames: Vec<String> = Vec::new();
         for repo in repos.expect("repos is None") {
             let token_copy = access_token.clone();

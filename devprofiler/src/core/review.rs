@@ -2,9 +2,9 @@ use std::env;
 
 use serde_json::Value;
 
-use crate::{utils::{hunk::{HunkMap, PrHunkItem}, review::Review, gitops::{commit_exists, git_pull, get_excluded_files, generate_diff, process_diff, generate_blame}}, db::{hunk::{get_hunk_from_db, store_hunkmap_to_db}, repo::get_clone_url_clone_dir, review::save_review_to_db}};
+use crate::{utils::{hunk::{HunkMap, PrHunkItem}, review::Review, gitops::{commit_exists, git_pull, get_excluded_files, generate_diff, process_diff, generate_blame}}, db::{hunk::{get_hunk_from_db, store_hunkmap_to_db}, repo::get_clone_url_clone_dir, review::save_review_to_db}, core::coverage::process_coverage};
 
-pub async fn process_review(message_data: &Vec<u8>) -> Option<HunkMap> {
+pub async fn process_review(message_data: &Vec<u8>) {
 	let review_opt = get_tasks(message_data);
 	match review_opt {
 		Some(review) => {
@@ -12,7 +12,7 @@ pub async fn process_review(message_data: &Vec<u8>) -> Option<HunkMap> {
 			match hunk {
 				Some(hunkval) => {
 					publish_hunkmap(&hunkval);
-					return Some(hunkval);},
+					return;},
 				None => {}
 			}
 			let mut prvec = Vec::<PrHunkItem>::new();
@@ -50,14 +50,13 @@ pub async fn process_review(message_data: &Vec<u8>) -> Option<HunkMap> {
                 );
 					store_hunkmap_to_db(&hunkmap, &review);
 					publish_hunkmap(&hunkmap);
-					return Some(hunkmap)
+					process_coverage(&hunkmap).await;
 				},
 				None => {eprintln!("No files to review for PR {}", review.id());}
 			};
 		},
 		None => { eprintln!("No review tasks found!" ); }
 	};
-	None		
 }
 
 fn get_tasks(message_data: &Vec<u8>) -> Option<Review>{
