@@ -23,7 +23,7 @@ struct SetupInfo {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct PublishRequest {
-    installation_id: String,
+    installationId: String,
     info: Vec<SetupInfo>,
 }
 
@@ -77,15 +77,17 @@ pub async fn handle_install_bitbucket(installation_code: &str) {
 async fn send_setup_info(setup_info: &Vec<SetupInfo>) {
     let installation_id = env::var("INSTALL_ID")
         .expect("INSTALL_ID must be set");
+    println!("install_id = {:?}", &installation_id);
     let base_url = env::var("SERVER_URL")
         .expect("SERVER_URL must be set");
     let body = PublishRequest {
-        installation_id: installation_id,
+        installationId: installation_id,
         info: setup_info.to_vec(),
     };
+    println!("body = {:?}", &body);
     let client = Client::new();
     let resp = client
-      .post(format!("{base_url}/api/rustapp/setup"))
+      .post(format!("{base_url}/api/rustApp/setup"))
       .json(&body)
       .send()
       .await
