@@ -7,6 +7,7 @@ use serde::Serialize;
 use sha256::digest;
 
 use crate::bitbucket::auth::refresh_git_auth;
+use crate::bitbucket::user::get_commit_bb;
 
 use super::hunk::BlameItem;
 use super::review::Review;
@@ -231,7 +232,7 @@ pub fn process_diff(diffmap: &HashMap<String, String>) -> HashMap<String, Vec<St
 	return linemap;
 }
 
-pub fn generate_blame(review: &Review, linemap: &HashMap<String, Vec<String>>) ->  Vec<BlameItem>{
+pub async fn generate_blame(review: &Review, linemap: &HashMap<String, Vec<String>>) ->  Vec<BlameItem>{
 	let mut blamevec = Vec::<BlameItem>::new();
 	let commit = review.pr_head_commit();
 	let clone_dir = review.clone_dir();
@@ -261,7 +262,8 @@ pub fn generate_blame(review: &Review, linemap: &HashMap<String, Vec<String>>) -
 								continue;
 							}
 							let linenumint = linenum.parse::<usize>().expect("Unable to parse linenum");
-							let lineauthormap = process_blamelines(&blamelines, linenumint);
+							let lineauthormap = process_blamelines(&blamelines, linenumint,
+                                &review.repo_name(), &review.repo_owner()).await;
 							let mut linebreak = linenumint;
 							for lidx in linenumint..(linenumint + blamelines.len()-1) {
 								if lineauthormap.contains_key(&lidx) && lineauthormap.contains_key(&(lidx+1)) {
@@ -321,11 +323,14 @@ impl LineItem {
     }
 }
 
-fn process_blamelines(blamelines: &Vec<&str>, linenum: usize) -> HashMap<usize, LineItem> {
+async fn process_blamelines(blamelines: &Vec<&str>, linenum: usize,
+    repo_name: &str, repo_owner: &str) -> HashMap<usize, LineItem> {
 	let mut linemap = HashMap::<usize, LineItem>::new();
 	for lnum  in 0..blamelines.len() {
 		let ln = blamelines[lnum];
 		let wordvec: Vec<&str> = ln.split(" ").collect();
+        let commit = wordvec[0];
+        let lineitem = get_commit_bb(commit, repo_name, repo_owner).await;
 		let mut author = wordvec[1];
 		let mut timestamp = wordvec[2];
 		let mut idx = 1;

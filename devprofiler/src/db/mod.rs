@@ -5,3 +5,4 @@ mod config;
 pub mod webhook;
 pub mod hunk;
 pub mod review;
+pub mod user;
