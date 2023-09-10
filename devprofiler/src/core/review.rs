@@ -56,15 +56,16 @@ pub async fn process_review(message_data: &Vec<u8>) {
 fn get_tasks(message_data: &Vec<u8>) -> Option<Review>{
 	match serde_json::from_slice::<Value>(&message_data) {
 		Ok(data) => {
-			let repo_provider = data["repository_provider"].to_string().trim_matches('"').to_string();
-			let repo_name = data["event_payload"]["repository"]["name"].to_string().trim_matches('"').to_string();
+			println!("data == {:?}", &data["eventPayload"]["repository"]);
+			let repo_provider = data["repositoryProvider"].to_string().trim_matches('"').to_string();
+			let repo_name = data["eventPayload"]["repository"]["name"].to_string().trim_matches('"').to_string();
 			println!("repo NAME == {}", &repo_name);
-			let workspace_name = data["event_payload"]["repository"]["workspace"]["slug"].to_string().trim_matches('"').to_string();
+			let workspace_name = data["eventPayload"]["repository"]["workspace"]["slug"].to_string().trim_matches('"').to_string();
 			let (clone_url, clone_dir) = get_clone_url_clone_dir(&repo_provider, &workspace_name, &repo_name);
-			let pr_id = data["event_payload"]["pullrequest"]["id"].to_string().trim_matches('"').to_string();
+			let pr_id = data["eventPayload"]["pullrequest"]["id"].to_string().trim_matches('"').to_string();
 			let review = Review::new(
-                data["event_payload"]["pullrequest"]["destination"]["commit"]["hash"].to_string().replace("\"", ""),
-				data["event_payload"]["pullrequest"]["source"]["commit"]["hash"].to_string().replace("\"", ""),
+                data["eventPayload"]["pullrequest"]["destination"]["commit"]["hash"].to_string().replace("\"", ""),
+				data["eventPayload"]["pullrequest"]["source"]["commit"]["hash"].to_string().replace("\"", ""),
 				pr_id.clone(),
                 repo_name.clone(),
                 workspace_name.clone(),
@@ -72,7 +73,7 @@ fn get_tasks(message_data: &Vec<u8>) -> Option<Review>{
 				format!("bitbucket/{}/{}/{}", &workspace_name, &repo_name, &pr_id),
 				clone_dir,
 				clone_url,
-				data["event_payload"]["pullrequest"]["author"]["account_id"].to_string().replace("\"", ""),
+				data["eventPayload"]["pullrequest"]["author"]["account_id"].to_string().replace("\"", ""),
             );
 			println!("review = {:?}", &review);
 			save_review_to_db(&review);
