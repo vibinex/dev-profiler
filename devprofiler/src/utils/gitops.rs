@@ -181,7 +181,7 @@ pub fn generate_diff(review: &Review, smallfiles: &Vec<StatItem>) -> HashMap<Str
 	return diffmap;
 }
 
-pub fn process_diff(diffmap: &HashMap<String, String>) -> Result<HashMap<String, Vec<String>>,Box<dyn Error>> {
+pub fn process_diff(diffmap: &HashMap<String, String>) -> HashMap<String, Vec<String>> {
 	let mut linemap: HashMap<String, Vec<String>> = HashMap::new();
 	for (filepath, diff) in diffmap {
 		let mut limiterpos = Vec::new();
@@ -228,7 +228,7 @@ pub fn process_diff(diffmap: &HashMap<String, String>) -> Result<HashMap<String,
 			idx += 1;
 		}
 	}
-	return Ok(linemap);
+	return linemap;
 }
 
 pub fn generate_blame(review: &Review, linemap: &HashMap<String, Vec<String>>) ->  Vec<BlameItem>{
