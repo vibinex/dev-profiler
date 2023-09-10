@@ -34,7 +34,7 @@ pub async fn process_review(message_data: &Vec<u8>) {
 	let diffmap = generate_diff(&review, &smallfiles);
 	println!("diffmap = {:?}", &diffmap);
 	let linemap = process_diff(&diffmap);
-	let blamevec = generate_blame(&review, &linemap);
+	let blamevec = generate_blame(&review, &linemap).await;
 	let hmapitem = PrHunkItem::new(
 		review.id().to_string(),
 		review.author().to_string(),
