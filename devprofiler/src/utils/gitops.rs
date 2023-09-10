@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::error::Error;
 use std::process::Command;
 use std::str;
 use serde::Deserialize;
@@ -11,6 +10,7 @@ use crate::bitbucket::user::get_commit_bb;
 
 use super::hunk::BlameItem;
 use super::review::Review;
+use super::lineitem::LineItem;
 
 #[derive(Debug, Serialize, Default, Deserialize)]
 pub struct StatItem {
@@ -268,13 +268,13 @@ pub async fn generate_blame(review: &Review, linemap: &HashMap<String, Vec<Strin
 							for lidx in linenumint..(linenumint + blamelines.len()-1) {
 								if lineauthormap.contains_key(&lidx) && lineauthormap.contains_key(&(lidx+1)) {
 									let lineitem = lineauthormap.get(&lidx).expect("lidx checked");
-									if lineitem.author == 
-									lineauthormap.get(&(lidx+1)).expect("lidx+1 checked").author {
+									if lineitem.author_id() == 
+									lineauthormap.get(&(lidx+1)).expect("lidx+1 checked").author_id() {
 										continue;
 									}
 									else {
 										blamevec.push(BlameItem::new(
-											lineitem.author().to_string(),
+											lineitem.author_id().to_string(),
 											lineitem.timestamp().to_string(),
 											linebreak.to_string(),
 											lidx.to_string(),
@@ -287,7 +287,7 @@ pub async fn generate_blame(review: &Review, linemap: &HashMap<String, Vec<Strin
 							if lineauthormap.contains_key(&lastidx) {
 								let lineitem = lineauthormap.get(&lastidx).expect("lastidx checked");
 								blamevec.push(BlameItem::new(
-									lineitem.author().to_string(),
+									lineitem.author_id().to_string(),
 									lineitem.timestamp().to_string(),
 									linebreak.to_string(),
 									lastidx.to_string(),
@@ -306,21 +306,6 @@ pub async fn generate_blame(review: &Review, linemap: &HashMap<String, Vec<Strin
 		}
 	}
 	return blamevec;
-}
-
-struct LineItem {
-    author: String,
-    timestamp: String,
-}
-
-impl LineItem {
-    fn author(&self) -> &String {
-        &self.author
-    }
-
-    fn timestamp(&self) -> &String {
-        &self.timestamp
-    }
 }
 
 async fn process_blamelines(blamelines: &Vec<&str>, linenum: usize,
@@ -356,7 +341,7 @@ async fn process_blamelines(blamelines: &Vec<&str>, linenum: usize,
 		}
 		linemap.insert(
 			linenum + lnum,
-			LineItem { author: authorstr.to_string(), timestamp: timestamp.to_string() }
+			LineItem::new(authorstr.to_string(), timestamp.to_string())
 		);
 	}
 	return linemap;

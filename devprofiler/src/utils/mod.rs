@@ -6,3 +6,4 @@ pub mod hunk;
 pub mod review;
 pub mod gitops;
 pub mod user;
+pub mod lineitem;
