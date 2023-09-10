@@ -9,6 +9,7 @@ pub fn bitbucket_base_url() -> String {
 
 pub async fn get_api(url: &str, access_token: &str, params: Option<HashMap<&str, &str>> ) -> Vec<Value> {
     let response_opt = call_get_api(url, access_token, &params).await;
+    println!("response of get_api = {:?}", &response_opt);
     let (mut response_values, next_url) = deserialize_response(response_opt).await;
     if next_url.is_some() {
         let mut page_values = get_all_pages(next_url, access_token, &params).await;
@@ -17,7 +18,7 @@ pub async fn get_api(url: &str, access_token: &str, params: Option<HashMap<&str,
     return response_values;
 }
 
-async fn call_get_api(url: &str, access_token: &str, params: &Option<HashMap<&str, &str>> ) -> Option<Response>{
+pub async fn call_get_api(url: &str, access_token: &str, params: &Option<HashMap<&str, &str>> ) -> Option<Response>{
     println!("GET api url = {}", url);
     let client = reqwest::Client::new();
     let mut headers = reqwest::header::HeaderMap::new(); 

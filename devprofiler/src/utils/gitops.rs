@@ -316,32 +316,9 @@ async fn process_blamelines(blamelines: &Vec<&str>, linenum: usize,
 		let wordvec: Vec<&str> = ln.split(" ").collect();
         let commit = wordvec[0];
         let lineitem = get_commit_bb(commit, repo_name, repo_owner).await;
-		let mut author = wordvec[1];
-		let mut timestamp = wordvec[2];
-		let mut idx = 1;
-		if author == "" {
-			while idx < wordvec.len() && wordvec[idx] == "" {
-				idx = idx + 1;
-			}
-			if idx < wordvec.len() {
-				author = wordvec[idx];
-			}
-		}
-		let authorstr = author.replace("(", "")
-			.replace("<", "")
-			.replace(">", "");
-		if timestamp == "" {
-			idx = idx + 1;
-			while idx < wordvec.len() && wordvec[idx] == "" {
-				idx = idx + 1;
-			}
-			if idx < wordvec.len() {
-				timestamp = wordvec[idx];
-			}
-		}
 		linemap.insert(
 			linenum + lnum,
-			LineItem::new(authorstr.to_string(), timestamp.to_string())
+			lineitem
 		);
 	}
 	return linemap;
