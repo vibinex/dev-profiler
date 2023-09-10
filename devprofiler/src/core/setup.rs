@@ -9,6 +9,7 @@ use crate::bitbucket::auth::get_access_token_from_bitbucket;
 use crate::bitbucket::repo::get_workspace_repos;
 use crate::bitbucket::workspace::get_bitbucket_workspaces;
 use crate::bitbucket::webhook::{get_webhooks_in_repo, add_webhook};
+use crate::bitbucket::user::get_and_save_workspace_users;
 use crate::db::repo::save_repo_to_db;
 use crate::db::webhook::save_webhook_to_db;
 use crate::utils::repo::Repository;

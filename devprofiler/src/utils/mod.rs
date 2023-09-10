@@ -5,3 +5,4 @@ pub mod webhook;
 pub mod hunk;
 pub mod review;
 pub mod gitops;
+pub mod user;
