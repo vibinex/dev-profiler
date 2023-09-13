@@ -1,6 +1,6 @@
-use chrono::{DateTime, Utc, TimeZone, FixedOffset};
+use chrono::{DateTime, Utc, FixedOffset};
 use crate::db::auth::auth_info;
-use crate::db::user::save_user_to_db;
+use crate::db::user::{save_user_to_db, user_from_db};
 use crate::utils::auth::AuthInfo;
 use crate::utils::lineitem::LineItem;
 use crate::utils::user::{User, Provider, ProviderEnum};
@@ -42,6 +42,17 @@ pub async fn get_commit_bb(commit: &str, repo_name: &str, repo_owner: &str) -> L
 
     let unix_timestamp = datetime_utc.timestamp();
     let unix_timestamp_str = unix_timestamp.to_string();
-    let author_str = response_json["author"]["user"]["uuid"].to_string().replace('"', "");
-    return LineItem::new(author_str, unix_timestamp_str);
+    let author_id = response_json["author"]["user"]["uuid"].to_string().replace('"', "");
+    let author_name = response_json["author"]["user"]["display_name"].to_string().replace('"', "");
+    let user_opt = user_from_db(
+        &ProviderEnum::Bitbucket.to_string(), 
+        repo_owner, &author_id);
+    if user_opt.is_none() {
+        let user = User::new(
+            Provider::new(author_id.clone(), 
+            ProviderEnum::Bitbucket), 
+            author_name, repo_owner.to_string(), None);
+        save_user_to_db(&user);
+    }
+    return LineItem::new(author_id, unix_timestamp_str);
 }

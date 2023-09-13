@@ -62,7 +62,7 @@ pub async fn refresh_git_auth(clone_url: &str, directory: &str) -> String{
     return access_token;
 }
 
-async fn update_access_token(auth_info: &AuthInfo) -> Option<AuthInfo> {
+pub async fn update_access_token(auth_info: &AuthInfo) -> Option<AuthInfo> {
 
     let now = SystemTime::now();
     let now_secs = now.duration_since(UNIX_EPOCH).expect("Time went backwards").as_secs();
