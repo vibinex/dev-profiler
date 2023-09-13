@@ -24,7 +24,7 @@ pub async fn process_coverage(hunkmap: &HunkMap) {
 
 fn calculate_coverage(repo_owner: &str, prhunk: &PrHunkItem) -> HashMap<String, String>{
     let mut coverage_map = HashMap::<String, String>::new();
-    let mut coverage_float = HashMap::<String, f32>::new();
+    let mut coverage_floatmap = HashMap::<String, f32>::new();
     let mut total = 0.0;
     for blame in prhunk.blamevec() {
         let author_id = blame.author().to_owned();
@@ -32,19 +32,19 @@ fn calculate_coverage(repo_owner: &str, prhunk: &PrHunkItem) -> HashMap<String, 
             - blame.line_start().parse::<f32>().expect("lines_end invalid float")
             + 1.0;
         total += num_lines;
-        if coverage_float.contains_key(&author_id) {
-            coverage_float.insert(author_id, num_lines);
+        if coverage_floatmap.contains_key(&author_id) {
+            let coverage = coverage_floatmap.get(&author_id).expect("unable to find coverage for author")
+                + num_lines;
+            coverage_floatmap.insert(author_id, coverage);
         }
         else {
-            let coverage = coverage_float.get(&author_id).expect("unable to find coverage for author")
-                + num_lines;
-            coverage_float.insert(author_id, coverage);
+            coverage_floatmap.insert(author_id, num_lines);
         }
     }
     if total <= 0.0 {
         return coverage_map;
     } 
-    for (key, value) in coverage_float.iter_mut() {
+    for (key, value) in coverage_floatmap.iter_mut() {
         *value = *value / total * 100.0;
         let formatted_value = format!("{:.2}", *value);
         let user = user_from_db("bitbucket", repo_owner, key);
@@ -61,16 +61,17 @@ fn calculate_coverage(repo_owner: &str, prhunk: &PrHunkItem) -> HashMap<String, 
 }
 
 fn comment_text(coverage_map: HashMap<String, String>) -> String {
-    let mut comment = "Relevant users for this PR:
-        | Contributor Name/Alias  | Code Coverage |
-        | -------------- | --------------- |
-        ".to_string();
+    let mut comment = "Relevant users for this PR:\n\n".to_string();  // Added two newlines
+    comment += "| Contributor Name/Alias  | Code Coverage |\n";  // Added a newline at the end
+    comment += "| -------------- | --------------- |\n";  // Added a newline at the end
+
     for (key, value) in coverage_map.iter() {
-        comment += &format!("| {} | {}% |\n", key, value);
+        comment += &format!("| {} | {}% |\n", key, value);  // Added a newline at the end
     }
+
     comment += "\n\n";
-    comment += "Code coverage is calculated based on the git blame information of the PR. To know more, hit us up at contact@vibinex.com.";
-    comment += "\n";
-    comment += "To change comment and auto-assign settings, go to [your Vibinex settings page.](https://vibinex.com/settings)";
+    comment += "Code coverage is calculated based on the git blame information of the PR. To know more, hit us up at contact@vibinex.com.\n\n";  // Added two newlines
+    comment += "To change comment and auto-assign settings, go to [your Vibinex settings page.](https://vibinex.com/settings)\n";  // Added a newline at the end
+
     return comment;
 }
