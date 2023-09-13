@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{utils::hunk::{HunkMap, PrHunkItem}, db::user::user_from_db, bitbucket::comment::add_comment};
+use crate::{utils::hunk::{HunkMap, PrHunkItem}, db::user::user_from_db, bitbucket::comment::{add_comment, add_reviewers}};
 
 pub async fn process_coverage(hunkmap: &HunkMap) {
     for prhunk in hunkmap.prhunkvec() {
@@ -15,8 +15,13 @@ pub async fn process_coverage(hunkmap: &HunkMap) {
                 &hunkmap.repo_name(), 
                 prhunk.pr_number(), 
                 &comment).await;
-            // get reviewers
             // add reviewers
+            for blame in prhunk.blamevec() {
+                let author_id = blame.author();
+                add_reviewers(&hunkmap.repo_owner(), 
+                    &hunkmap.repo_name(),
+            &author_id).await;
+            }
             // TODO - implement settings
         }    
     }
