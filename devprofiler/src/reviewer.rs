@@ -263,8 +263,9 @@ fn store_hunkmap(hunkmap: HunkMap, einfo: &mut RuntimeInfo) {
 
 fn get_excluded_files(prev_commit: &str, next_commit: &str, einfo: &mut RuntimeInfo) -> Option<(Vec<StatItem>, Vec<StatItem>)> {
 	// Use the command
+	let commit_range = format!("{}...{}", prev_commit, next_commit);
 	match Command::new("git")
-		.args(&["diff", prev_commit, next_commit, "--numstat"])
+		.args(&["diff", &commit_range, "--numstat"])
 		.output() {
 			Ok(resultstat) => {
 				let stat = resultstat.stdout;
